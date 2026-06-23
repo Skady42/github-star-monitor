@@ -1,5 +1,5 @@
 const GITHUB_API = 'https://api.github.com';
-const CONNECTIVITY_TIMEOUT = 5000;
+const CONNECTIVITY_TIMEOUT = 8000;
 const REQUEST_TIMEOUT = 10000;
 
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
@@ -22,16 +22,18 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
 }
 
 export async function checkConnectivity() {
-  try {
-    const response = await fetchWithTimeout(
-      GITHUB_API,
-      { headers: {} },
-      CONNECTIVITY_TIMEOUT
-    );
-    return response.ok || response.status === 401;
-  } catch {
-    return false;
+  const urls = [GITHUB_API, 'https://github.com'];
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, { headers: {} }, CONNECTIVITY_TIMEOUT);
+      if (response.ok || response.status === 401 || response.status === 403) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
   }
+  return false;
 }
 
 export async function getStarredRepos(token) {
@@ -59,7 +61,8 @@ export async function getStarredRepos(token) {
       full_name: r.full_name,
       owner: r.owner.login,
       name: r.name,
-      html_url: r.html_url
+      html_url: r.html_url,
+      stargazers_count: r.stargazers_count || 0
     })));
 
     hasMore = data.length === perPage;

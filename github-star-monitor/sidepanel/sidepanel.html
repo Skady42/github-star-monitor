@@ -32,10 +32,10 @@
         <input class="config-input" type="password" id="clientSecretInput" placeholder="ghs_...">
         <div class="config-actions">
           <button class="config-save-btn" id="configSaveBtn">保存凭证</button>
-          <button class="auth-btn" id="authBtn" style="display:none">连接 GitHub 账号</button>
         </div>
         <div class="config-status" id="configStatus"></div>
       </div>
+      <button class="auth-btn" id="authBtn" style="display:none">连接 GitHub 账号</button>
     </section>
 
     <section class="actions">
@@ -49,7 +49,17 @@
     </section>
 
     <section class="updates-section">
-      <h2 class="section-title">最新 Release 更新</h2>
+      <div class="list-toolbar">
+        <input class="search-input" type="text" id="searchInput" placeholder="搜索仓库名...">
+        <select class="sort-select" id="sortSelect">
+          <option value="newest">更新: 新→旧</option>
+          <option value="oldest">更新: 旧→新</option>
+          <option value="az">名称: A→Z</option>
+          <option value="za">名称: Z→A</option>
+          <option value="stars-desc">标星: 多→少</option>
+          <option value="stars-asc">标星: 少→多</option>
+        </select>
+      </div>
       <div class="update-list" id="updateList">
         <div class="empty-state" id="emptyState">
           &#x1f7e2; 暂无更新

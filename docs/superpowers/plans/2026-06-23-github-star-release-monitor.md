@@ -2,20 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Chrome extension that monitors starred GitHub repos for new releases, checks hourly, and pushes system notifications.
+**Goal:** Build a Chrome/Edge extension that monitors starred GitHub repos for new releases, checks hourly, and pushes system notifications. Uses Side Panel for UI.
 
-**Architecture:** Manifest V3 Service Worker with chrome.alarms for scheduling, chrome.storage.local for persistence, chrome.identity for GitHub OAuth, and a plain HTML/CSS/JS popup for the UI.
+**Architecture:** Manifest V3 ES Module Service Worker with chrome.alarms for scheduling, chrome.storage.local for persistence, chrome.identity for GitHub OAuth, chrome.sidePanel for UI, and chrome.notifications for alerts.
 
-**Tech Stack:** Manifest V3, vanilla JS (ES2020+), no npm/build dependencies, pure Chrome Extension APIs.
+**Tech Stack:** Manifest V3 (ES Module SW), vanilla JS (ES2020+), no npm/build dependencies, pure Chrome Extension APIs.
 
 ## Global Constraints
 
 - No npm dependencies — all vanilla JS
-- Manifest V3 only
-- Service Worker (not persistent background page)
+- Manifest V3 only, ES Module mode (`"type": "module"` in background config)
+- Service Worker uses `import` syntax, utils use `export` syntax
+- Side Panel UI (chrome.sidePanel API), NOT popup
 - All API calls must have timeout handling (5s connectivity, 10s data)
-- Popup size: 380×480px
 - Color scheme: light mode, GitHub-inspired
+- No fixed width on UI — side panel fills available space
 
 ---
 
@@ -23,18 +24,11 @@
 
 **Files:**
 - Create: `github-star-monitor/manifest.json`
-- Create: `github-star-monitor/icons/` (placeholder note)
 
 **Interfaces:**
-- Produces: manifest with all permissions, SW registration, popup config
+- Produces: manifest with all permissions, ES Module SW, side panel config
 
-- [ ] **Step 1: Create project directory structure**
-
-```bash
-mkdir -p github-star-monitor/icons github-star-monitor/popup github-star-monitor/utils
-```
-
-- [ ] **Step 2: Write manifest.json**
+- [ ] **Step 1: Write manifest.json**
 
 ```json
 {
@@ -42,13 +36,16 @@ mkdir -p github-star-monitor/icons github-star-monitor/popup github-star-monitor
   "name": "GitHub Star Release Monitor",
   "version": "1.0.0",
   "description": "监控 GitHub Star 仓库的新 Release，整点推送通知",
-  "permissions": ["storage", "alarms", "notifications", "identity"],
+  "permissions": ["storage", "alarms", "notifications", "identity", "sidePanel"],
   "host_permissions": ["https://api.github.com/*", "https://github.com/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
   },
   "action": {
-    "default_popup": "popup/popup.html",
     "default_title": "GitHub Star Monitor",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -64,15 +61,11 @@ mkdir -p github-star-monitor/icons github-star-monitor/popup github-star-monitor
 }
 ```
 
-- [ ] **Step 3: Create placeholder icon** (单色 SVG 转 PNG 的占位说明)
-
-Create a simple star icon using any method (Sketch, Figma, online converter). Requirements: 16×16, 48×48, 128×128, PNG format, #24292f dark star on #f6f8fa light bg. For quick start, use a solid-color square as placeholder.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
-git add github-star-monitor/
-git commit -m "chore: scaffold extension with manifest.json"
+git add github-star-monitor/manifest.json
+git commit -m "chore: scaffold extension with manifest.json (ES Module + Side Panel)"
 ```
 
 ---
@@ -83,7 +76,7 @@ git commit -m "chore: scaffold extension with manifest.json"
 - Create: `github-star-monitor/utils/storage.js`
 
 **Interfaces:**
-- Produces:
+- Produces (all `export`):
   - `getToken()` → Promise<string|null>
   - `setToken(token)` → Promise<void>
   - `getUser()` → Promise<string|null>
@@ -92,7 +85,7 @@ git commit -m "chore: scaffold extension with manifest.json"
   - `setLastCheckTime(isoString)` → Promise<void>
   - `getKnownReleases()` → Promise<Object> — { "owner/repo": "tag" }
   - `getPendingUpdates()` → Promise<Array>
-  - `mergeNewReleases(allRepos, newReleases)` → Promise<Array> — saves to storage, returns merged
+  - `mergeNewReleases(allStarredRepos, newReleases)` → Promise<Array>
   - `getLastCheckStatus()` → Promise<string|null>
   - `setLastCheckStatus(status)` → Promise<void>
   - `clearUpdates()` → Promise<void>
@@ -149,7 +142,6 @@ export async function getPendingUpdates() {
 }
 
 export async function mergeNewReleases(allStarredRepos, newReleases) {
-  // newReleases: Array<{ repo, tag, name, url, published_at }>
   const known = await getKnownReleases();
   const existing = await getPendingUpdates();
   const genuinelyNew = [];
@@ -162,7 +154,6 @@ export async function mergeNewReleases(allStarredRepos, newReleases) {
     }
   }
 
-  // Clean up known_releases: remove repos no longer starred
   const starredSet = new Set(allStarredRepos.map(r => r.full_name));
   for (const key of Object.keys(known)) {
     if (!starredSet.has(key)) delete known[key];
@@ -206,8 +197,7 @@ git commit -m "feat: add storage utility for chrome.storage.local"
 - Create: `github-star-monitor/utils/github-api.js`
 
 **Interfaces:**
-- Consumes: `getToken` from storage.js (conceptual — imported at use site)
-- Produces:
+- Produces (all `export`):
   - `checkConnectivity()` → Promise<boolean>
   - `getStarredRepos(token)` → Promise<Array>
   - `getLatestRelease(token, owner, repo)` → Promise<Object|null>
@@ -247,7 +237,7 @@ export async function checkConnectivity() {
       { headers: {} },
       CONNECTIVITY_TIMEOUT
     );
-    return response.ok || response.status === 401; // 401 means reachable but unauthenticated
+    return response.ok || response.status === 401;
   } catch {
     return false;
   }
@@ -352,8 +342,7 @@ export function notifyUpdates(updates) {
       priority: 2
     });
   } else {
-    // 汇总通知
-    const repoList = updates.map(u => `• ${u.repo} → ${u.tag}`).join('\n');
+    const repoList = updates.map(u => `${u.repo} -> ${u.tag}`).join('\n');
     chrome.notifications.create(`release-summary-${Date.now()}`, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
@@ -380,32 +369,35 @@ git commit -m "feat: add notification utility"
 - Create: `github-star-monitor/background.js`
 
 **Interfaces:**
-- Consumes: all functions from storage.js, github-api.js, notifications.js
-- Produces: Alarm scheduling, OAuth flow, release check logic, message handler
+- Consumes: all functions from storage.js, github-api.js, notifications.js (via `import`)
+- Produces: Alarm scheduling, OAuth flow, release check logic, message handler, side panel opener
 - `chrome.alarms` with name `"check-releases"`
-- `chrome.runtime.onMessage` handles: `"startOAuth"`, `"checkNow"`, `"getStatus"`
+- `chrome.runtime.onMessage` handles: `"startOAuth"`, `"checkNow"`, `"getStatus"`, `"logout"`
+- `chrome.action.onClicked` opens side panel
 
-- [ ] **Step 1: Write background.js — imports and alarm setup**
+- [ ] **Step 1: Write background.js (complete file)**
 
 ```js
-// background.js
+// background.js — ES Module mode
 
-// NOTE: In MV3 SW, we can't use ES module imports directly without
-// "type": "module" in manifest or importScripts. We'll use importScripts.
+import {
+  getToken, setToken, getUser, setUser,
+  getLastCheckTime, setLastCheckTime,
+  getKnownReleases, getPendingUpdates, mergeNewReleases,
+  getLastCheckStatus, setLastCheckStatus
+} from './utils/storage.js';
 
-importScripts(
-  'utils/storage.js',
-  'utils/github-api.js',
-  'utils/notifications.js'
-);
+import {
+  checkConnectivity, getStarredRepos, getLatestRelease
+} from './utils/github-api.js';
+
+import { notifyUpdates } from './utils/notifications.js';
 
 const ALARM_NAME = 'check-releases';
-const CHECK_INTERVAL_HOURS = 1;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-// GitHub OAuth config — user must fill these in after creating a GitHub OAuth App
 const GITHUB_OAUTH = {
-  clientId: 'YOUR_GITHUB_CLIENT_ID',  // TODO: replace
+  clientId: 'YOUR_GITHUB_CLIENT_ID',
   redirectUri: chrome.identity.getRedirectURL('oauth2'),
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenUrl: 'https://github.com/login/oauth/access_token'
@@ -414,10 +406,9 @@ const GITHUB_OAUTH = {
 function setupAlarm() {
   chrome.alarms.clear(ALARM_NAME, () => {
     const now = new Date();
-    // 计算下一个整点
     const nextHour = new Date(now);
     nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-    const delayMinutes = (nextHour - now) / 60000; // minutes
+    const delayMinutes = (nextHour - now) / 60000;
 
     chrome.alarms.create(ALARM_NAME, {
       periodInMinutes: 60,
@@ -426,14 +417,10 @@ function setupAlarm() {
     console.log(`[Monitor] Alarm set for ${nextHour.toISOString()} (in ${Math.round(delayMinutes)}min)`);
   });
 }
-```
 
-- [ ] **Step 2: Write background.js — check logic**
-
-```js
 async function performCheck() {
   console.log('[Monitor] Starting release check...');
-  
+
   const token = await getToken();
   if (!token) {
     await setLastCheckStatus('no_token');
@@ -441,7 +428,6 @@ async function performCheck() {
     return;
   }
 
-  // 前置连通性检测
   const connected = await checkConnectivity();
   if (!connected) {
     await setLastCheckStatus('network_error');
@@ -450,11 +436,9 @@ async function performCheck() {
   }
 
   try {
-    // 获取 star 列表
     const repos = await getStarredRepos(token);
     console.log(`[Monitor] Found ${repos.length} starred repos`);
 
-    // 逐个查最新 Release
     const newReleases = [];
     for (const repo of repos) {
       try {
@@ -464,11 +448,9 @@ async function performCheck() {
         }
       } catch (err) {
         console.warn(`[Monitor] Failed for ${repo.full_name}:`, err.message);
-        // 单个仓库失败不中断整体流程
       }
     }
 
-    // 对比已知 Release，收集真正的更新
     const genuinelyNew = await mergeNewReleases(
       repos.map(r => r.full_name),
       newReleases
@@ -486,14 +468,9 @@ async function performCheck() {
   } catch (err) {
     console.error('[Monitor] Check failed:', err);
     await setLastCheckStatus('error');
-    // 不更新检查时间，下次启动补检
   }
 }
-```
 
-- [ ] **Step 3: Write background.js — OAuth flow**
-
-```js
 async function startOAuth() {
   const authUrl = new URL(GITHUB_OAUTH.authUrl);
   authUrl.searchParams.set('client_id', GITHUB_OAUTH.clientId);
@@ -507,7 +484,6 @@ async function startOAuth() {
       interactive: true
     });
 
-    // 解析回调 URL 中的 code 参数
     const url = new URL(redirectUrl);
     const code = url.searchParams.get('code');
 
@@ -515,7 +491,6 @@ async function startOAuth() {
       throw new Error('No authorization code received');
     }
 
-    // 用 code 换 token
     const tokenResponse = await fetch(GITHUB_OAUTH.tokenUrl, {
       method: 'POST',
       headers: {
@@ -524,7 +499,7 @@ async function startOAuth() {
       },
       body: JSON.stringify({
         client_id: GITHUB_OAUTH.clientId,
-        client_secret: 'YOUR_GITHUB_CLIENT_SECRET', // TODO: replace
+        client_secret: 'YOUR_GITHUB_CLIENT_SECRET',
         code: code,
         redirect_uri: GITHUB_OAUTH.redirectUri
       })
@@ -534,7 +509,6 @@ async function startOAuth() {
     if (tokenData.access_token) {
       await setToken(tokenData.access_token);
 
-      // 获取用户信息
       const userResponse = await fetch('https://api.github.com/user', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -545,7 +519,6 @@ async function startOAuth() {
       const userData = await userResponse.json();
       await setUser(userData.login);
 
-      // 首次授权后立即检查
       await performCheck();
       return { success: true, user: userData.login };
     }
@@ -555,19 +528,25 @@ async function startOAuth() {
     return { success: false, error: err.message };
   }
 }
-```
 
-- [ ] **Step 4: Write background.js — event listeners**
+// Click action icon -> open side panel
+chrome.action.onClicked.addListener((tab) => {
+  chrome.sidePanel.open({ windowId: tab.windowId });
+});
 
-```js
-// Alarm: 定时检查
+// Enable side panel globally
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error(error));
+
+// Alarm: hourly check
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     performCheck();
   }
 });
 
-// 消息处理: popup → SW
+// Message handler: sidepanel -> SW
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     switch (message.action) {
@@ -594,8 +573,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
 
       case 'logout':
-        await setToken(null);
-        await setUser(null);
         await chrome.storage.local.clear();
         sendResponse({ success: true });
         break;
@@ -604,26 +581,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: 'Unknown action' });
     }
   })();
-  return true; // keep channel open for async response
+  return true;
 });
 
-// 安装/更新: 注册 Alarm + 启动补检
+// Install/Update: register alarm + startup check
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[Monitor] Extension installed/updated:', details.reason);
   setupAlarm();
-  
-  // 启动补检
+
   const lastCheckTime = await getLastCheckTime();
   if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > ONE_HOUR_MS) {
     await performCheck();
   }
 });
 
-// 浏览器启动: 补检
+// Browser startup: catch-up check
 chrome.runtime.onStartup.addListener(async () => {
   console.log('[Monitor] Browser started');
   setupAlarm();
-  
+
   const lastCheckTime = await getLastCheckTime();
   if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > ONE_HOUR_MS) {
     await performCheck();
@@ -631,27 +607,27 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add github-star-monitor/background.js
-git commit -m "feat: add service worker with alarms, OAuth, and release checks"
+git commit -m "feat: add ES module service worker with alarms, OAuth, side panel, and release checks"
 ```
 
 ---
 
-### Task 6: Popup UI
+### Task 6: Side Panel UI
 
 **Files:**
-- Create: `github-star-monitor/popup/popup.html`
-- Create: `github-star-monitor/popup/popup.css`
-- Create: `github-star-monitor/popup/popup.js`
+- Create: `github-star-monitor/sidepanel/sidepanel.html`
+- Create: `github-star-monitor/sidepanel/sidepanel.css`
+- Create: `github-star-monitor/sidepanel/sidepanel.js`
 
 **Interfaces:**
 - Consumes: `chrome.runtime.sendMessage` to communicate with background.js
-- Produces: Full user interface
+- Produces: Full side panel UI (no fixed width, fills available space)
 
-- [ ] **Step 1: Write popup.html**
+- [ ] **Step 1: Write sidepanel.html**
 
 ```html
 <!DOCTYPE html>
@@ -659,17 +635,15 @@ git commit -m "feat: add service worker with alarms, OAuth, and release checks"
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
   <div id="app">
-    <!-- 标题栏 -->
     <header class="header">
       <h1 class="title">GitHub Star Monitor</h1>
       <span class="status-dot" id="statusDot"></span>
     </header>
 
-    <!-- OAuth 状态区 -->
     <section class="auth-section" id="authSection">
       <div class="auth-connected" id="authConnected" style="display:none">
         <span class="connected-icon">&#9679;</span>
@@ -680,7 +654,6 @@ git commit -m "feat: add service worker with alarms, OAuth, and release checks"
       </button>
     </section>
 
-    <!-- 操作区 -->
     <section class="actions">
       <button class="check-btn" id="checkBtn">
         &#x21bb; 手动检查更新
@@ -691,7 +664,6 @@ git commit -m "feat: add service worker with alarms, OAuth, and release checks"
       </div>
     </section>
 
-    <!-- 更新列表 -->
     <section class="updates-section">
       <h2 class="section-title">最新 Release 更新</h2>
       <div class="update-list" id="updateList">
@@ -707,17 +679,16 @@ git commit -m "feat: add service worker with alarms, OAuth, and release checks"
       </div>
     </section>
 
-    <!-- 底部 -->
     <footer class="footer">
       <button class="logout-btn" id="logoutBtn" style="display:none">退出登录</button>
     </footer>
   </div>
-  <script src="popup.js"></script>
+  <script src="sidepanel.js"></script>
 </body>
 </html>
 ```
 
-- [ ] **Step 2: Write popup.css**
+- [ ] **Step 2: Write sidepanel.css**
 
 ```css
 * {
@@ -727,16 +698,18 @@ git commit -m "feat: add service worker with alarms, OAuth, and release checks"
 }
 
 body {
-  width: 380px;
-  min-height: 400px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   color: #24292f;
   background: #f6f8fa;
+  min-height: 100vh;
 }
 
 #app {
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .header {
@@ -840,7 +813,10 @@ body {
 .check-result-warning { color: #9a6700; }
 
 .updates-section {
+  flex: 1;
   margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .section-title {
@@ -853,7 +829,7 @@ body {
 }
 
 .update-list {
-  max-height: 240px;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -942,10 +918,10 @@ body {
 }
 ```
 
-- [ ] **Step 3: Write popup.js**
+- [ ] **Step 3: Write sidepanel.js**
 
 ```js
-// popup/popup.js
+// sidepanel/sidepanel.js
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
@@ -967,12 +943,10 @@ async function loadStatus() {
   const checkTime = document.getElementById('checkTime');
   const checkResult = document.getElementById('checkResult');
   const logoutBtn = document.getElementById('logoutBtn');
-  const updateList = document.getElementById('updateList');
   const emptyState = document.getElementById('emptyState');
   const errorState = document.getElementById('errorState');
   const noTokenState = document.getElementById('noTokenState');
 
-  // OAuth 状态
   if (status.hasToken && status.user) {
     statusDot.classList.add('connected');
     authConnected.style.display = 'flex';
@@ -988,26 +962,22 @@ async function loadStatus() {
     logoutBtn.style.display = 'none';
   }
 
-  // 检查状态
   if (status.lastCheckTime) {
     const time = new Date(status.lastCheckTime);
-    const relative = getRelativeTime(time);
-    checkTime.textContent = `上次检查: ${relative}`;
+    checkTime.textContent = `上次检查: ${getRelativeTime(time)}`;
   }
 
-  // 状态标记
   if (status.status === 'success') {
-    checkResult.textContent = '成功 ✓';
+    checkResult.textContent = '成功';
     checkResult.className = 'check-result-success';
   } else if (status.status === 'network_error') {
-    checkResult.textContent = '网络不通 ✗';
+    checkResult.textContent = '网络不通';
     checkResult.className = 'check-result-error';
   } else if (status.status === 'error') {
-    checkResult.textContent = '检查失败 ✗';
+    checkResult.textContent = '检查失败';
     checkResult.className = 'check-result-error';
   }
 
-  // 更新列表
   if (!status.hasToken) {
     noTokenState.style.display = 'block';
     emptyState.style.display = 'none';
@@ -1032,8 +1002,6 @@ function renderUpdateList(updates) {
   const noTokenState = document.getElementById('noTokenState');
 
   [emptyState, errorState, noTokenState].forEach(el => el.style.display = 'none');
-
-  // 清除旧条目（保留状态元素）
   updateList.querySelectorAll('.update-item').forEach(el => el.remove());
 
   updates
@@ -1125,40 +1093,24 @@ function escapeHtml(str) {
 - [ ] **Step 4: Commit**
 
 ```bash
-git add github-star-monitor/popup/
-git commit -m "feat: add popup UI with status display and update list"
+git add github-star-monitor/sidepanel/
+git commit -m "feat: add side panel UI with status display and update list"
 ```
 
 ---
 
-### Task 7: 图标生成 & 最终检查
+### Task 7: 图标生成
 
 **Files:**
 - Create: `github-star-monitor/icons/icon16.png`
 - Create: `github-star-monitor/icons/icon48.png`
 - Create: `github-star-monitor/icons/icon128.png`
 
-**Interfaces:**
-- Produces: Icon assets for extension
+- [ ] **Step 1: Generate icon files**
 
-- [ ] **Step 1: Generate icon using ImageGen**
+Use ImageGen to create a GitHub star-themed icon, then save as 16x16, 48x48, 128x128 PNGs.
 
-Use the deferred ImageGen tool to create a GitHub Star-themed icon:
-- Prompt: "A simple flat star icon on light gray background, GitHub-style, modern minimal design, suitable for 128x128"
-- Generate at 128×128, then downscale to 48×48 and 16×16
-
-- [ ] **Step 2: Verify manifest.json has no placeholders**
-
-Check that `GITHUB_OAUTH.clientId` and `client_secret` in background.js are noted as user-configurable (marked with TODO comments).
-
-- [ ] **Step 3: Self-review checklist**
-
-1. All files reference correct paths
-2. No console errors expected at runtime
-3. Permissions in manifest match actual API usage
-4. importScripts paths are correct relative to extension root
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add github-star-monitor/icons/
@@ -1172,16 +1124,54 @@ git commit -m "feat: add extension icons"
 **Files:**
 - Create: `github-star-monitor/README.md`
 
-**Interfaces:** (none)
-- Produces: User-facing setup guide
+- [ ] **Step 1: Write README.md**
 
-- [ ] **Step 1: Write README with setup instructions**
+```markdown
+# GitHub Star Release Monitor
 
-Write README.md containing:
-1. GitHub OAuth App 创建步骤
-2. 填入 clientId / clientSecret 的位置
-3. Chrome 加载已解压扩展的步骤
-4. 首次授权流程
+Chrome/Edge 扩展，监控 GitHub Star 仓库的新 Release，整点自动检查并推送系统通知。
+
+## 安装步骤
+
+### 1. 创建 GitHub OAuth App
+
+1. 打开 https://github.com/settings/developers
+2. 点击 "New OAuth App"
+3. 填写信息:
+   - Application name: GitHub Star Monitor
+   - Homepage URL: (任意)
+   - Authorization callback URL: 从扩展的 background.js 控制台获取 redirectUri
+4. 创建后获取 Client ID 和 Client Secret
+
+### 2. 配置扩展
+
+打开 `background.js`，替换以下值:
+- `YOUR_GITHUB_CLIENT_ID` -> 你的 Client ID
+- `YOUR_GITHUB_CLIENT_SECRET` -> 你的 Client Secret
+
+### 3. 加载扩展
+
+Chrome/Edge:
+1. 打开 `edge://extensions/` 或 `chrome://extensions/`
+2. 开启 "开发者模式"
+3. 点击 "加载已解压的扩展程序"
+4. 选择 `github-star-monitor/` 目录
+
+### 4. 首次使用
+
+1. 点击工具栏扩展图标，打开侧边栏
+2. 点击 "连接 GitHub 账号" 进行 OAuth 授权
+3. 授权后自动检查一次，之后每小时整点自动检查
+
+## 功能
+
+- 每小时整点检查 Star 仓库的新 Release
+- 浏览器启动时如距上次检查超 1 小时则立即补检
+- 系统通知推送汇总更新
+- 侧边栏展示更新列表，点击跳转仓库
+- 手动检查按钮
+- 网络超时自动跳过，不误报
+```
 
 - [ ] **Step 2: Commit**
 
@@ -1194,13 +1184,13 @@ git commit -m "docs: add setup instructions"
 
 ## Completion Checklist
 
-- [ ] `manifest.json` — MV3, all permissions correct
-- [ ] `background.js` — SW with alarms, OAuth, check logic
-- [ ] `utils/storage.js` — chrome.storage.local wrapper
-- [ ] `utils/github-api.js` — fetch with timeout, starred repos, releases
-- [ ] `utils/notifications.js` — notification creation
-- [ ] `popup/popup.html` — layout structure
-- [ ] `popup/popup.css` — styles (380px wide)
-- [ ] `popup/popup.js` — interactivity, messaging
+- [ ] `manifest.json` — MV3, ES Module, sidePanel permission
+- [ ] `background.js` — ES Module SW with import, alarms, OAuth, side panel, check logic
+- [ ] `utils/storage.js` — chrome.storage.local wrapper (export)
+- [ ] `utils/github-api.js` — fetch with timeout, starred repos, releases (export)
+- [ ] `utils/notifications.js` — notification creation (export)
+- [ ] `sidepanel/sidepanel.html` — layout structure
+- [ ] `sidepanel/sidepanel.css` — responsive styles, no fixed width
+- [ ] `sidepanel/sidepanel.js` — interactivity, messaging
 - [ ] `icons/` — 16/48/128 PNG icons
 - [ ] `README.md` — OAuth setup guide

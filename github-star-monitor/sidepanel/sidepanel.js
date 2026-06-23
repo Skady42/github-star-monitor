@@ -4,12 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function init() {
   // 显示 redirect URI
-  document.getElementById('redirectUri').textContent =
-    chrome.identity ? '获取中...' : 'https://扩展ID.chromiumapp.org/oauth2';
   try {
-    const uri = await new Promise(r => chrome.identity.getRedirectURL('oauth2', r));
-    document.getElementById('redirectUri').textContent = uri;
-  } catch (e) {}
+    const uri = chrome.identity.getRedirectURL('oauth2');
+    document.getElementById('redirectUri').textContent = uri || '获取失败，请查看扩展ID';
+  } catch (e) {
+    document.getElementById('redirectUri').textContent = '获取失败，请查看扩展ID';
+  }
 
   await loadStatus();
   setupEventListeners();
@@ -17,6 +17,11 @@ async function init() {
 
 async function loadStatus() {
   const status = await sendMessage({ action: 'getStatus' });
+
+  // 用 SW 返回的 redirectUri 覆盖（确保准确）
+  if (status.redirectUri) {
+    document.getElementById('redirectUri').textContent = status.redirectUri;
+  }
 
   const statusDot = document.getElementById('statusDot');
   const authConnected = document.getElementById('authConnected');
@@ -91,32 +96,70 @@ async function loadStatus() {
   }
 }
 
+let currentUpdates = [];
+
 function renderUpdateList(updates) {
+  currentUpdates = updates;
+  applyFilters();
+}
+
+function applyFilters() {
   const updateList = document.getElementById('updateList');
   const emptyState = document.getElementById('emptyState');
   const errorState = document.getElementById('errorState');
   const noTokenState = document.getElementById('noTokenState');
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  const sortMode = document.getElementById('sortSelect').value;
 
   [emptyState, errorState, noTokenState].forEach(el => el.style.display = 'none');
   updateList.querySelectorAll('.update-item').forEach(el => el.remove());
 
-  updates
-    .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))
-    .forEach(update => {
-      const a = document.createElement('a');
-      a.className = 'update-item';
-      a.href = update.url;
-      a.target = '_blank';
-      a.innerHTML = `
-        <div class="update-item-title">${escapeHtml(update.name || update.tag)}</div>
-        <div class="update-item-repo">${escapeHtml(update.repo)}</div>
-        <div class="update-item-time">${getRelativeTime(new Date(update.published_at))}</div>
-      `;
-      updateList.appendChild(a);
-    });
+  let filtered = currentUpdates.filter(u =>
+    u.repo.toLowerCase().includes(searchTerm)
+  );
+
+  switch (sortMode) {
+    case 'newest':
+      filtered.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+      break;
+    case 'oldest':
+      filtered.sort((a, b) => new Date(a.detected_at) - new Date(b.detected_at));
+      break;
+    case 'az':
+      filtered.sort((a, b) => a.repo.toLowerCase().localeCompare(b.repo.toLowerCase()));
+      break;
+    case 'za':
+      filtered.sort((a, b) => b.repo.toLowerCase().localeCompare(a.repo.toLowerCase()));
+      break;
+    case 'stars-desc':
+      filtered.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+      break;
+    case 'stars-asc':
+      filtered.sort((a, b) => (a.stars || 0) - (b.stars || 0));
+      break;
+  }
+
+  filtered.forEach(update => {
+    const a = document.createElement('a');
+    a.className = 'update-item';
+    a.href = update.url;
+    a.target = '_blank';
+    a.innerHTML = `
+      <div class="update-item-repo">${escapeHtml(update.repo)}</div>
+      <div class="update-item-meta">
+        <span class="update-item-tag">${escapeHtml(update.tag)}</span>
+        <span class="update-item-date">${formatDate(new Date(update.published_at))}</span>
+      </div>
+    `;
+    updateList.appendChild(a);
+  });
 }
 
 function setupEventListeners() {
+  // 搜索和排序
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+  document.getElementById('sortSelect').addEventListener('change', applyFilters);
+
   // 保存凭证
   document.getElementById('configSaveBtn').addEventListener('click', async () => {
     const clientId = document.getElementById('clientIdInput').value.trim();
@@ -206,6 +249,13 @@ function getRelativeTime(date) {
   if (hours < 24) return hours + '小时前';
   if (days < 30) return days + '天前';
   return date.toLocaleDateString('zh-CN');
+}
+
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function escapeHtml(str) {

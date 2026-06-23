@@ -62,6 +62,7 @@ async function performCheck() {
       try {
         const release = await getLatestRelease(token, repo.owner, repo.name);
         if (release) {
+          release.stars = repo.stargazers_count || 0;
           newReleases.push(release);
         }
       } catch (err) {
@@ -195,7 +196,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const user = await getUser();
         const token = await getToken();
         const hasCreds = !!(await getOAuthClientId() && await getOAuthClientSecret());
-        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds });
+        const redirUri = chrome.identity.getRedirectURL('oauth2');
+        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds, redirectUri: redirUri });
         break;
 
       case 'logout':

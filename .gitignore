@@ -1,0 +1,6 @@
+.workbuddy/
+.superpowers/
+*.crx
+*.zip
+*.pem
+docs/

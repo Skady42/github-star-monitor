@@ -1,55 +1,44 @@
 # GitHub Star Release Monitor
 
-Chrome/Edge 扩展，监控 GitHub Star 仓库的新 Release，整点自动检查并推送系统通知。
+监控 GitHub Star 仓库的新 Release，整点自动检查并推送系统通知。
 
 ## 功能
 
-- 每小时整点检查 Star 仓库的新 Release
-- 浏览器启动时如距上次检查超 1 小时则立即补检
-- 系统通知推送汇总更新
-- 侧边栏 (Side Panel) 展示更新列表，点击跳转仓库
-- 手动检查按钮
-- 网络超时自动跳过，不误报
+- **自动检查** — 每小时整点检查 Star 仓库的新 Release
+- **启动补检** — 浏览器启动时如距上次检查超 1 小时则立即补检
+- **系统通知** — 汇总推送新增 Release
+- **侧边栏** — 通过 Edge/Chrome Side Panel 展示更新列表，点击跳转仓库
+- **可视化配置** — 侧边栏内直接填入 OAuth 凭证，无需编辑代码
+- **搜索排序** — 支持按仓库名搜索、A-Z/时间/Star 数排序
+- **手动检查** — 一键手动触发检查
+- **网络容错** — 前置连通性检测 + 超时自动跳过
 
-## 安装步骤
+## 安装
 
 ### 1. 创建 GitHub OAuth App
 
-1. 打开 https://github.com/settings/developers
-2. 点击 "New OAuth App"
-3. 填写信息:
-   - Application name: GitHub Star Monitor
-   - Homepage URL: (任意)
-   - Authorization callback URL: 暂时填 `https://github.com/`，加载扩展后从控制台获取真实 redirectUri
-4. 创建后获取 Client ID 和 Client Secret
+打开 https://github.com/settings/developers → New OAuth App：
 
-### 2. 获取 Redirect URI
+| 字段 | 值 |
+|------|-----|
+| Application name | GitHub Star Monitor |
+| Homepage URL | 任意 |
+| Authorization callback URL | 见下一步 |
 
-加载扩展后（见步骤 3），在 Service Worker 控制台执行:
-```js
-chrome.identity.getRedirectURL('oauth2')
-```
-将输出的 URL 填入 GitHub OAuth App 的 Authorization callback URL。
+### 2. 加载扩展
 
-### 3. 配置扩展
-
-打开 `background.js`，替换以下值:
-- `YOUR_GITHUB_CLIENT_ID` 替换为你的 Client ID
-- `YOUR_GITHUB_CLIENT_SECRET` 替换为你的 Client Secret
-
-### 4. 加载扩展
-
-Chrome/Edge:
 1. 打开 `edge://extensions/` 或 `chrome://extensions/`
-2. 开启 "开发者模式"
-3. 点击 "加载已解压的扩展程序"
+2. 开启「开发人员模式」
+3. 点击「加载解压缩的扩展」
 4. 选择 `github-star-monitor/` 目录
 
-### 5. 首次使用
+### 3. 配置回调地址
 
-1. 点击工具栏扩展图标，打开侧边栏
-2. 点击 "连接 GitHub 账号" 进行 OAuth 授权
-3. 授权后自动检查一次，之后每小时整点自动检查
+打开扩展侧边栏（点击工具栏图标），第一行会显示 Redirect URI。把它填到 GitHub OAuth App 的 Authorization callback URL 中。
+
+### 4. 连接 GitHub
+
+在侧边栏填入 GitHub OAuth App 的 Client ID 和 Client Secret → 保存凭证 → 点击「连接 GitHub 账号」完成授权。
 
 ## 文件结构
 
@@ -71,13 +60,12 @@ github-star-monitor/
     └── icon128.png
 ```
 
-## 技术细节
+## 技术栈
 
 - **Manifest V3** + ES Module Service Worker
-- **chrome.alarms** 整点调度，浏览器启动补检
-- **chrome.sidePanel** 侧边栏 UI
-- **chrome.identity.launchWebAuthFlow** GitHub OAuth
-- **chrome.notifications** 系统通知
-- 前置连通性检测 (5s 超时)，不通则跳过整轮检查
-- 单仓库 Release 请求 10s 超时，单个失败不中断整体
+- **chrome.alarms** — 整点调度
+- **chrome.sidePanel** — 侧边栏 UI
+- **chrome.identity.launchWebAuthFlow** — GitHub OAuth
+- **chrome.notifications** — 系统通知
+- **chrome.storage.local** — 数据持久化
 - 零依赖，纯原生 JS
