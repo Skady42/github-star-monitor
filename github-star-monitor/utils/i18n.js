@@ -45,7 +45,13 @@ export const translations = {
     minsAgo: '分钟前',
     hrsAgo: '小时前',
     daysAgo: '天前',
-    justNow: '刚刚'
+    justNow: '刚刚',
+    logManagement: '日志管理',
+    logCount: '日志条数',
+    exportLog: '导出日志',
+    clearLog: '清空日志',
+    noLogs: '暂无日志',
+    logExported: '日志已导出'
   },
   en: {
     title: 'STAR MONITOR',
@@ -93,6 +99,12 @@ export const translations = {
     minsAgo: 'm ago',
     hrsAgo: 'h ago',
     daysAgo: 'd ago',
-    justNow: 'just now'
+    justNow: 'just now',
+    logManagement: 'LOG MANAGEMENT',
+    logCount: 'LOG ENTRIES',
+    exportLog: 'EXPORT LOG',
+    clearLog: 'CLEAR LOG',
+    noLogs: 'NO LOG ENTRIES',
+    logExported: 'LOG EXPORTED'
   }
 };

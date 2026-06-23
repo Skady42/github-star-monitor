@@ -1,5 +1,6 @@
 import { translations } from '../utils/i18n.js';
 import { getLanguage, setLanguage } from '../utils/storage.js';
+import { getLogs, clearLogs, exportLogs } from '../utils/logger.js';
 
 let currentLang = 'zh';
 
@@ -25,6 +26,7 @@ async function init() {
 
   await loadStatus();
   setupEventListeners();
+  updateLogStats();
 }
 
 function applyLanguage() {
@@ -60,6 +62,13 @@ function applyLanguage() {
   document.querySelectorAll('.config-label')[0].textContent = t('clientId');
   document.querySelectorAll('.config-label')[1].textContent = t('clientSecret');
   document.getElementById('configSaveBtn').textContent = t('saveCreds');
+
+  // Log management
+  document.getElementById('logManagementLabel').textContent = t('logManagement');
+  document.getElementById('exportLogBtn').textContent = t('exportLog');
+  document.getElementById('clearLogBtn').textContent = t('clearLog');
+  // Refresh log count display with new language
+  document.getElementById('logCountDisplay').textContent = t('logCount') + ': ' + (document.getElementById('logCountDisplay').textContent.split(': ')[1] || '0');
 }
 
 async function loadStatus() {
@@ -203,6 +212,12 @@ function applyFilters() {
   });
 }
 
+async function updateLogStats() {
+  const logs = await getLogs();
+  const count = logs ? logs.length : 0;
+  document.getElementById('logCountDisplay').textContent = t('logCount') + ': ' + count;
+}
+
 function setupEventListeners() {
   document.getElementById('searchInput').addEventListener('input', applyFilters);
   document.getElementById('sortSelect').addEventListener('change', applyFilters);
@@ -277,6 +292,9 @@ function setupEventListeners() {
     btn.textContent = t('scanning');
     btn.disabled = true;
 
+    const checkTimeEl = document.getElementById('checkTime');
+    checkTimeEl.textContent = t('scanning');
+
     const result = await sendMessage({ action: 'checkNow' });
     btn.textContent = originalText;
     btn.disabled = false;
@@ -323,6 +341,38 @@ function setupEventListeners() {
       statusEl.textContent = 'FAILED';
       statusEl.className = 'settings-status error';
     }
+  });
+
+  // Log management
+  document.getElementById('exportLogBtn').addEventListener('click', async () => {
+    const logs = await getLogs();
+    if (!logs || logs.length === 0) {
+      const status = document.getElementById('logStatus');
+      status.textContent = t('noLogs');
+      status.className = 'log-status error';
+      return;
+    }
+
+    const text = await exportLogs();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `star-monitor-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const status = document.getElementById('logStatus');
+    status.textContent = t('logExported');
+    status.className = 'log-status';
+  });
+
+  document.getElementById('clearLogBtn').addEventListener('click', async () => {
+    await clearLogs();
+    document.getElementById('logCountDisplay').textContent = t('logCount') + ': 0';
+    const status = document.getElementById('logStatus');
+    status.textContent = t('logCount') + ': 0';
+    status.className = 'log-status';
   });
 }
 

@@ -5,21 +5,35 @@ import {
   getLastCheckStatus, setLastCheckStatus,
   getOAuthClientId, setOAuthClientId,
   getOAuthClientSecret, setOAuthClientSecret,
-  getCheckInterval, setCheckInterval
+  getCheckInterval, setCheckInterval,
+  getReleaseEtags, setReleaseEtags
 } from './utils/storage.js';
 
 import {
   checkConnectivity, getStarredRepos, getLatestRelease
 } from './utils/github-api.js';
 
-import { notifyUpdates } from './utils/notifications.js';
+import { notifyUpdates, notifyScanComplete } from './utils/notifications.js';
+
+import { debug as logDebug, info as logInfo, warn as logWarn, error as logError } from './utils/logger.js';
 
 const ALARM_NAME = 'check-releases';
+const CONCURRENCY = 3;
 
 const GITHUB_OAUTH = {
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenUrl: 'https://github.com/login/oauth/access_token'
 };
+
+async function batchWithConcurrency(items, limit, handler) {
+  const results = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    const batchResults = await Promise.all(batch.map(handler));
+    results.push(...batchResults);
+  }
+  return results;
+}
 
 function setupAlarm() {
   getCheckInterval().then(interval => {
@@ -34,61 +48,79 @@ function setupAlarm() {
         periodInMinutes: periodMinutes,
         delayInMinutes: delayMinutes
       });
-      console.log(`[Monitor] Alarm set for ${nextHour.toISOString()} (interval: ${periodMinutes}min)`);
+      logInfo('alarm_set', `Alarm set for ${nextHour.toISOString()} (interval: ${periodMinutes}min)`);
     });
   });
 }
 
 async function performCheck() {
-  console.log('[Monitor] Starting release check...');
+  logInfo('check_start', '开始检查更新');
 
   const token = await getToken();
   if (!token) {
     await setLastCheckStatus('no_token');
-    console.log('[Monitor] No token, skipping check');
+    logWarn('check_skip_no_token', '无 Token，跳过检查');
     return;
   }
 
   const connected = await checkConnectivity();
   if (!connected) {
     await setLastCheckStatus('network_error');
-    console.log('[Monitor] GitHub unreachable, skipping check');
+    logWarn('check_skip_network', 'GitHub 不可达，跳过检查');
     return;
   }
 
   try {
+    const scanStart = performance.now();
     const repos = await getStarredRepos(token);
-    console.log(`[Monitor] Found ${repos.length} starred repos`);
+    logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
 
-    const newReleases = [];
-    for (const repo of repos) {
+    const etags = await getReleaseEtags();
+
+    const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
       try {
-        const release = await getLatestRelease(token, repo.owner, repo.name);
-        if (release) {
-          release.stars = repo.stargazers_count || 0;
-          newReleases.push(release);
+        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
+        if (result.release) {
+          result.release.stars = repo.stargazers_count || 0;
         }
+        return { full_name: repo.full_name, ...result };
       } catch (err) {
-        console.warn(`[Monitor] Failed for ${repo.full_name}:`, err.message);
+        logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
+        return { full_name: repo.full_name, changed: false, etag: etags[repo.full_name], release: null };
       }
-    }
+    });
 
+    const newReleases = repoResults.filter(r => r.release).map(r => r.release);
+
+    // ⚠️ 必须先 mergeNewReleases 再 setReleaseEtags！
+    // 如果 ETag 先更新但 known 还没写，SW 被杀后新 Release 会被 304 永久跳过
     const genuinelyNew = await mergeNewReleases(
       repos.map(r => r.full_name),
       newReleases
     );
 
+    const newEtags = {};
+    for (const r of repoResults) {
+      if (r.etag) newEtags[r.full_name] = r.etag;
+    }
+    await setReleaseEtags(newEtags);
+
+    const elapsed = performance.now() - scanStart;
+
     if (genuinelyNew.length > 0) {
-      console.log(`[Monitor] Found ${genuinelyNew.length} new release(s)`);
+      logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
       notifyUpdates(genuinelyNew);
     } else {
-      console.log('[Monitor] No new releases');
+      logInfo('check_no_new', '没有新更新');
     }
+
+    // 总是发送扫描完成通知（即使无新 Release）
+    notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
 
     await setLastCheckTime(new Date().toISOString());
     await setLastCheckStatus('success');
   } catch (err) {
-    console.error('[Monitor] Check failed:', err);
+    logError('check_failed', '检查失败', { error: err.message });
     await setLastCheckStatus('error');
   }
 }
@@ -149,12 +181,14 @@ async function startOAuth() {
       const userData = await userResponse.json();
       await setUser(userData.login);
 
+      logInfo('oauth_success', 'OAuth 授权成功', { user: userData.login });
+
       await performCheck();
       return { success: true, user: userData.login };
     }
     throw new Error('Failed to get access token');
   } catch (err) {
-    console.error('[Monitor] OAuth failed:', err);
+    logError('oauth_failed', 'OAuth 失败', { error: err.message });
     return { success: false, error: err.message };
   }
 }
@@ -183,6 +217,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'saveCredentials':
         await setOAuthClientId(message.clientId);
         await setOAuthClientSecret(message.clientSecret);
+        logInfo('creds_saved', 'OAuth 凭证已保存');
         sendResponse({ success: true });
         break;
 
@@ -213,6 +248,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'logout':
         await chrome.storage.local.clear();
+        logInfo('logout', '用户已登出');
         sendResponse({ success: true });
         break;
 
@@ -231,8 +267,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async (details) => {
-  console.log('[Monitor] Extension installed/updated:', details.reason);
+  logInfo('extension_installed', `扩展安装/更新: ${details.reason}`);
   setupAlarm();
+
+  if (details.reason === 'update') {
+    // 清理 pending_updates 中被旧版本 ETag bug 污染的重复条目
+    const updates = await getPendingUpdates();
+    if (updates.length > 0) {
+      const latestPerRepo = new Map();
+      for (const u of updates) {
+        const prev = latestPerRepo.get(u.repo);
+        if (!prev || new Date(u.published_at) > new Date(prev.published_at)) {
+          latestPerRepo.set(u.repo, u);
+        }
+      }
+      await chrome.storage.local.set({
+        pending_updates: Array.from(latestPerRepo.values())
+      });
+      logInfo('cleanup_pending', `清理 ${updates.length} 条 pending_updates，去重后保留 ${latestPerRepo.size} 条`);
+    }
+  }
+
+  if (details.reason === 'install') {
+    // 首次安装跳过检查，避免所有标星仓库全部变成"新 Release"轰炸用户
+    const now = new Date().toISOString();
+    await setLastCheckTime(now);
+    logInfo('install_skip_check', '首次安装跳过检查，避免全部仓库标记为新 Release');
+    return;
+  }
 
   const lastCheckTime = await getLastCheckTime();
   const interval = await getCheckInterval();
@@ -242,7 +304,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('[Monitor] Browser started');
+  logInfo('browser_startup', '浏览器启动');
   setupAlarm();
 
   const lastCheckTime = await getLastCheckTime();

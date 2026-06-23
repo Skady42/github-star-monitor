@@ -8,7 +8,9 @@ const STORAGE_KEYS = {
   OAUTH_CLIENT_ID: 'oauth_client_id',
   OAUTH_CLIENT_SECRET: 'oauth_client_secret',
   CHECK_INTERVAL: 'check_interval',
-  LANG: 'language'
+  LANG: 'language',
+  RELEASE_ETAGS: 'release_etags',
+  LOGS: 'app_logs'
 };
 
 export async function getToken() {
@@ -50,7 +52,6 @@ export async function getPendingUpdates() {
 
 export async function mergeNewReleases(allStarredRepoNames, newReleases) {
   const known = await getKnownReleases();
-  const existing = await getPendingUpdates();
   const genuinelyNew = [];
 
   const starredSet = new Set(allStarredRepoNames);
@@ -71,28 +72,21 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
     if (!starredSet.has(key)) delete known[key];
   }
 
-  // 过滤 pending_updates 中已取消标星的旧条目
-  const filteredExisting = existing.filter(entry => starredSet.has(entry.repo));
-  const merged = [...genuinelyNew, ...filteredExisting];
-
-  // 去重：每个仓库只保留最新一条
-  const deduped = [];
-  const seen = new Set();
-  for (const entry of merged) {
-    if (seen.has(entry.repo)) continue;
-    seen.add(entry.repo);
-    deduped.push(entry);
-  }
-
+  // ✅ 每次扫描替换 pending_updates 为 genuinelyNew，不合并旧的
+  // 避免 pending_updates 只增不减的累积问题
   await chrome.storage.local.set({
     [STORAGE_KEYS.KNOWN_RELEASES]: known,
-    [STORAGE_KEYS.PENDING_UPDATES]: deduped
+    [STORAGE_KEYS.PENDING_UPDATES]: genuinelyNew
   });
 
   return genuinelyNew;
 }
 
 export async function clearUpdates() {
+  await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: [] });
+}
+
+export async function clearPendingUpdates() {
   await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: [] });
 }
 
@@ -139,4 +133,13 @@ export async function getLanguage() {
 
 export async function setLanguage(lang) {
   await chrome.storage.local.set({ [STORAGE_KEYS.LANG]: lang });
+}
+
+export async function getReleaseEtags() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.RELEASE_ETAGS);
+  return result[STORAGE_KEYS.RELEASE_ETAGS] || {};
+}
+
+export async function setReleaseEtags(etags) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.RELEASE_ETAGS]: etags });
 }

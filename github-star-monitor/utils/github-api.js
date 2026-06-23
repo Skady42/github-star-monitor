@@ -15,9 +15,26 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
         ...(options.headers || {})
       }
     });
+    await maybeWaitForRateLimit(response);
     return response;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function maybeWaitForRateLimit(response) {
+  const remaining = response.headers.get('X-RateLimit-Remaining');
+  const reset = response.headers.get('X-RateLimit-Reset');
+  if (!remaining || !reset) return;
+
+  const remainingNum = parseInt(remaining, 10);
+  const resetTime = parseInt(reset, 10) * 1000;
+  if (isNaN(remainingNum) || isNaN(resetTime)) return;
+
+  if (remainingNum < 10 && resetTime > Date.now()) {
+    const waitMs = Math.min(resetTime - Date.now(), 30000);
+    console.log(`[Monitor] Rate limit low (${remainingNum} remaining), waiting ${waitMs}ms`);
+    await new Promise(r => setTimeout(r, waitMs));
   }
 }
 
@@ -72,30 +89,46 @@ export async function getStarredRepos(token) {
   return repos;
 }
 
-export async function getLatestRelease(token, owner, repo) {
+export async function getLatestRelease(token, owner, repo, etag = null) {
+  const headers = { 'Authorization': `Bearer ${token}` };
+  if (etag) {
+    headers['If-None-Match'] = etag;
+  }
+
   const response = await fetchWithTimeout(
     `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=3`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }
+    { headers }
   );
 
-  if (response.status === 404) return null;
+  const newEtag = response.headers.get('ETag') || etag;
+
+  if (response.status === 304) {
+    return { changed: false, etag: newEtag, release: null };
+  }
+
+  if (response.status === 404) {
+    return { changed: false, etag: newEtag, release: null };
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to fetch releases for ${owner}/${repo}: ${response.status}`);
   }
 
   const releases = await response.json();
-  if (releases.length === 0) return null;
+  if (releases.length === 0) {
+    return { changed: false, etag: newEtag, release: null };
+  }
 
   const latest = releases[0];
   return {
-    repo: `${owner}/${repo}`,
-    tag: latest.tag_name,
-    name: latest.name || latest.tag_name,
-    url: latest.html_url,
-    published_at: latest.published_at
+    changed: true,
+    etag: newEtag,
+    release: {
+      repo: `${owner}/${repo}`,
+      tag: latest.tag_name,
+      name: latest.name || latest.tag_name,
+      url: latest.html_url,
+      published_at: latest.published_at
+    }
   };
 }
