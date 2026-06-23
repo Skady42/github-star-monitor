@@ -160,6 +160,23 @@ function setupEventListeners() {
   document.getElementById('searchInput').addEventListener('input', applyFilters);
   document.getElementById('sortSelect').addEventListener('change', applyFilters);
 
+  // 复制回调地址
+  document.getElementById('copyRedirectBtn').addEventListener('click', async () => {
+    const uri = document.getElementById('redirectUri').textContent;
+    try {
+      await navigator.clipboard.writeText(uri);
+      const btn = document.getElementById('copyRedirectBtn');
+      btn.textContent = '已复制';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '复制';
+        btn.classList.remove('copied');
+      }, 2000);
+    } catch {
+      document.getElementById('redirectUri').select();
+    }
+  });
+
   // 保存凭证
   document.getElementById('configSaveBtn').addEventListener('click', async () => {
     const clientId = document.getElementById('clientIdInput').value.trim();

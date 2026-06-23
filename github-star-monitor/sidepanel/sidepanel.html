@@ -21,10 +21,15 @@
         <div class="config-hint">
           需要 <strong>GitHub OAuth App</strong> 凭证才能连接：
           <ol>
-            <li>创建 OAuth App：<a href="https://github.com/settings/developers" target="_blank">github.com/settings/developers</a></li>
-            <li>回调地址填：<code id="redirectUri">chrome.identity.getRedirectURL</code></li>
-            <li>填入下方 Client ID 和 Secret</li>
+            <li><a href="https://github.com/settings/developers" target="_blank">创建 OAuth App</a></li>
+            <li>将下方的 <strong>Authorization callback URL</strong> 填进去</li>
+            <li>拿到 Client ID 和 Secret 后填入并保存</li>
           </ol>
+        </div>
+        <div class="redirect-box">
+          <div class="redirect-label">Authorization callback URL</div>
+          <code class="redirect-value" id="redirectUri">获取中...</code>
+          <button class="redirect-copy" id="copyRedirectBtn">复制</button>
         </div>
         <label class="config-label">Client ID</label>
         <input class="config-input" type="text" id="clientIdInput" placeholder="Ov23li...">

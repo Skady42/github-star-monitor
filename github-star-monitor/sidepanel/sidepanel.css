@@ -83,6 +83,53 @@ body {
 
 .auth-config { }
 
+.redirect-box {
+  background: #e6f1fb;
+  border: 1px solid #85b7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.redirect-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0c447c;
+  margin-bottom: 4px;
+}
+
+.redirect-value {
+  display: block;
+  font-size: 12px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  color: #185fa5;
+  word-break: break-all;
+  margin-bottom: 6px;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.redirect-copy {
+  padding: 3px 10px;
+  font-size: 11px;
+  background: #378add;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.redirect-copy:hover {
+  background: #185fa5;
+}
+
+.redirect-copy.copied {
+  background: #1a7f37;
+}
+
+.auth-config { }
+
 .config-hint {
   font-size: 12px;
   color: #656d76;
