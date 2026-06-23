@@ -24,7 +24,7 @@
 |------|-----|
 | Application name | `GitHub Star Monitor` |
 | Homepage URL | 随意填（如 `https://github.com`） |
-| Authorization callback URL | **先填 `https://github.com`**，后面再改 |
+| Authorization callback URL | **在插件中会自动获取复制输入**，后面再改 |
 
 创建后拿到 **Client ID** 和 **Client Secret**（点 Generate a new client secret）。
 
