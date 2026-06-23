@@ -9,6 +9,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo6QuNTEuC7vplVn4TZAotIIbf7ivCEuMpYDj/hoQw52R/Da2qg/HzW5JDPhwHVjVo+yVp5FNXTM4vF0/ByR3Xyu+xdC8SkW/F3kSgM2UGJrsVTD4YsjJ9LXEqWWqm+odKj8O+bwkGwiozhFMiDUVvfaRrfbzW+aFGCLIMX3jn8J5iAOkWeOj7OYaR1WlTAm6lSYW2Zi3obdSzeQ/kyNAI4jsfpfq1HPINazYTmJiRAjYzueml5JTHdxi3xqtLCZWwtgi9MYlHbhZV3NY+gmq8h5ierR5L3gnIF7A9wJQdqSK3R+QmQRkx++rHouqPxAxVA4uB/GVcdzdJZz5m2B5DwIDAQAB",
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },

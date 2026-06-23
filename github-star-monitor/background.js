@@ -2,7 +2,9 @@ import {
   getToken, setToken, getUser, setUser,
   getLastCheckTime, setLastCheckTime,
   getKnownReleases, getPendingUpdates, mergeNewReleases,
-  getLastCheckStatus, setLastCheckStatus
+  getLastCheckStatus, setLastCheckStatus,
+  getOAuthClientId, setOAuthClientId,
+  getOAuthClientSecret, setOAuthClientSecret
 } from './utils/storage.js';
 
 import {
@@ -15,8 +17,6 @@ const ALARM_NAME = 'check-releases';
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const GITHUB_OAUTH = {
-  clientId: 'YOUR_GITHUB_CLIENT_ID',
-  redirectUri: chrome.identity.getRedirectURL('oauth2'),
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenUrl: 'https://github.com/login/oauth/access_token'
 };
@@ -90,9 +90,17 @@ async function performCheck() {
 }
 
 async function startOAuth() {
+  const clientId = await getOAuthClientId();
+  const clientSecret = await getOAuthClientSecret();
+
+  if (!clientId || !clientSecret) {
+    return { success: false, error: '请先配置 GitHub OAuth 凭证' };
+  }
+
+  const redirectUri = chrome.identity.getRedirectURL('oauth2');
   const authUrl = new URL(GITHUB_OAUTH.authUrl);
-  authUrl.searchParams.set('client_id', GITHUB_OAUTH.clientId);
-  authUrl.searchParams.set('redirect_uri', GITHUB_OAUTH.redirectUri);
+  authUrl.searchParams.set('client_id', clientId);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('scope', 'read:user');
   authUrl.searchParams.set('state', Math.random().toString(36).substring(2));
 
@@ -116,10 +124,10 @@ async function startOAuth() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        client_id: GITHUB_OAUTH.clientId,
-        client_secret: 'YOUR_GITHUB_CLIENT_SECRET',
+        client_id: clientId,
+        client_secret: clientSecret,
         code: code,
-        redirect_uri: GITHUB_OAUTH.redirectUri
+        redirect_uri: redirectUri
       })
     });
 
@@ -161,6 +169,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     switch (message.action) {
+      case 'saveCredentials':
+        await setOAuthClientId(message.clientId);
+        await setOAuthClientSecret(message.clientSecret);
+        sendResponse({ success: true });
+        break;
+
       case 'startOAuth':
         const result = await startOAuth();
         sendResponse(result);
@@ -180,7 +194,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const u = await getPendingUpdates();
         const user = await getUser();
         const token = await getToken();
-        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token });
+        const hasCreds = !!(await getOAuthClientId() && await getOAuthClientSecret());
+        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds });
         break;
 
       case 'logout':

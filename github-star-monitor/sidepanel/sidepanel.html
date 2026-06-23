@@ -17,9 +17,25 @@
         <span class="connected-icon">&#9679;</span>
         <span id="authUser">已连接</span>
       </div>
-      <button class="auth-btn" id="authBtn" style="display:none">
-        连接 GitHub 账号
-      </button>
+      <div class="auth-config" id="authConfig" style="display:none">
+        <div class="config-hint">
+          需要 <strong>GitHub OAuth App</strong> 凭证才能连接：
+          <ol>
+            <li>创建 OAuth App：<a href="https://github.com/settings/developers" target="_blank">github.com/settings/developers</a></li>
+            <li>回调地址填：<code id="redirectUri">chrome.identity.getRedirectURL</code></li>
+            <li>填入下方 Client ID 和 Secret</li>
+          </ol>
+        </div>
+        <label class="config-label">Client ID</label>
+        <input class="config-input" type="text" id="clientIdInput" placeholder="Ov23li...">
+        <label class="config-label">Client Secret</label>
+        <input class="config-input" type="password" id="clientSecretInput" placeholder="ghs_...">
+        <div class="config-actions">
+          <button class="config-save-btn" id="configSaveBtn">保存凭证</button>
+          <button class="auth-btn" id="authBtn" style="display:none">连接 GitHub 账号</button>
+        </div>
+        <div class="config-status" id="configStatus"></div>
+      </div>
     </section>
 
     <section class="actions">

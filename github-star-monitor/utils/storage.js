@@ -4,7 +4,9 @@ const STORAGE_KEYS = {
   LAST_CHECK_TIME: 'last_check_time',
   KNOWN_RELEASES: 'known_releases',
   PENDING_UPDATES: 'pending_updates',
-  LAST_CHECK_STATUS: 'last_check_status'
+  LAST_CHECK_STATUS: 'last_check_status',
+  OAUTH_CLIENT_ID: 'oauth_client_id',
+  OAUTH_CLIENT_SECRET: 'oauth_client_secret'
 };
 
 export async function getToken() {
@@ -82,4 +84,22 @@ export async function getLastCheckStatus() {
 
 export async function setLastCheckStatus(status) {
   await chrome.storage.local.set({ [STORAGE_KEYS.LAST_CHECK_STATUS]: status });
+}
+
+export async function getOAuthClientId() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.OAUTH_CLIENT_ID);
+  return result[STORAGE_KEYS.OAUTH_CLIENT_ID] || null;
+}
+
+export async function setOAuthClientId(id) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.OAUTH_CLIENT_ID]: id });
+}
+
+export async function getOAuthClientSecret() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.OAUTH_CLIENT_SECRET);
+  return result[STORAGE_KEYS.OAUTH_CLIENT_SECRET] || null;
+}
+
+export async function setOAuthClientSecret(secret) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.OAUTH_CLIENT_SECRET]: secret });
 }

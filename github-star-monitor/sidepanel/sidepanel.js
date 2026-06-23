@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function init() {
+  // 显示 redirect URI
+  document.getElementById('redirectUri').textContent =
+    chrome.identity ? '获取中...' : 'https://扩展ID.chromiumapp.org/oauth2';
+  try {
+    const uri = await new Promise(r => chrome.identity.getRedirectURL('oauth2', r));
+    document.getElementById('redirectUri').textContent = uri;
+  } catch (e) {}
+
   await loadStatus();
   setupEventListeners();
 }
@@ -12,6 +20,7 @@ async function loadStatus() {
 
   const statusDot = document.getElementById('statusDot');
   const authConnected = document.getElementById('authConnected');
+  const authConfig = document.getElementById('authConfig');
   const authBtn = document.getElementById('authBtn');
   const authUser = document.getElementById('authUser');
   const checkBtn = document.getElementById('checkBtn');
@@ -23,23 +32,35 @@ async function loadStatus() {
   const noTokenState = document.getElementById('noTokenState');
 
   if (status.hasToken && status.user) {
+    // 已连接 GitHub
     statusDot.classList.add('connected');
     authConnected.style.display = 'flex';
     authUser.textContent = '已连接: ' + status.user;
+    authConfig.style.display = 'none';
     authBtn.style.display = 'none';
     checkBtn.disabled = false;
     logoutBtn.style.display = 'inline-block';
-  } else {
+  } else if (status.hasCredentials) {
+    // 有凭证但未授权
     statusDot.classList.remove('connected');
     authConnected.style.display = 'none';
+    authConfig.style.display = 'none';
     authBtn.style.display = 'block';
+    checkBtn.disabled = true;
+    logoutBtn.style.display = 'none';
+  } else {
+    // 未配置凭证
+    statusDot.classList.remove('connected');
+    authConnected.style.display = 'none';
+    authConfig.style.display = 'block';
+    authBtn.style.display = 'none';
     checkBtn.disabled = true;
     logoutBtn.style.display = 'none';
   }
 
   if (status.lastCheckTime) {
     const time = new Date(status.lastCheckTime);
-    checkTime.textContent = `上次检查: ${getRelativeTime(time)}`;
+    checkTime.textContent = '上次检查: ' + getRelativeTime(time);
   }
 
   if (status.status === 'success') {
@@ -96,6 +117,35 @@ function renderUpdateList(updates) {
 }
 
 function setupEventListeners() {
+  // 保存凭证
+  document.getElementById('configSaveBtn').addEventListener('click', async () => {
+    const clientId = document.getElementById('clientIdInput').value.trim();
+    const clientSecret = document.getElementById('clientSecretInput').value.trim();
+    const statusEl = document.getElementById('configStatus');
+
+    if (!clientId || !clientSecret) {
+      statusEl.textContent = '请填写 Client ID 和 Client Secret';
+      statusEl.className = 'config-status error';
+      return;
+    }
+
+    const result = await sendMessage({
+      action: 'saveCredentials',
+      clientId,
+      clientSecret
+    });
+
+    if (result.success) {
+      statusEl.textContent = '凭证已保存！';
+      statusEl.className = 'config-status';
+      await loadStatus();
+    } else {
+      statusEl.textContent = '保存失败: ' + (result.error || '未知错误');
+      statusEl.className = 'config-status error';
+    }
+  });
+
+  // OAuth 连接
   document.getElementById('authBtn').addEventListener('click', async () => {
     const btn = document.getElementById('authBtn');
     btn.textContent = '正在连接...';
@@ -152,9 +202,9 @@ function getRelativeTime(date) {
   const days = Math.floor(diff / 86400000);
 
   if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 30) return `${days}天前`;
+  if (minutes < 60) return minutes + '分钟前';
+  if (hours < 24) return hours + '小时前';
+  if (days < 30) return days + '天前';
   return date.toLocaleDateString('zh-CN');
 }
 
