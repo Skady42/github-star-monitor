@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1 class="title">GitHub Star Monitor</h1>
+      <span class="status-dot" id="statusDot"></span>
+    </header>
+
+    <section class="auth-section" id="authSection">
+      <div class="auth-connected" id="authConnected" style="display:none">
+        <span class="connected-icon">&#9679;</span>
+        <span id="authUser">已连接</span>
+      </div>
+      <button class="auth-btn" id="authBtn" style="display:none">
+        连接 GitHub 账号
+      </button>
+    </section>
+
+    <section class="actions">
+      <button class="check-btn" id="checkBtn">
+        &#x21bb; 手动检查更新
+      </button>
+      <div class="check-status" id="checkStatus">
+        <span id="checkTime">上次检查: --</span>
+        <span id="checkResult"></span>
+      </div>
+    </section>
+
+    <section class="updates-section">
+      <h2 class="section-title">最新 Release 更新</h2>
+      <div class="update-list" id="updateList">
+        <div class="empty-state" id="emptyState">
+          &#x1f7e2; 暂无更新
+        </div>
+        <div class="error-state" id="errorState" style="display:none">
+          &#x26a0; 网络连接失败，请检查代理后重试
+        </div>
+        <div class="error-state" id="noTokenState" style="display:none">
+          &#x1f511; 请先连接 GitHub 账号
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <button class="logout-btn" id="logoutBtn" style="display:none">退出登录</button>
+    </footer>
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
