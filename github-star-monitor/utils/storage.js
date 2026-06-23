@@ -48,12 +48,17 @@ export async function getPendingUpdates() {
   return result[STORAGE_KEYS.PENDING_UPDATES] || [];
 }
 
-export async function mergeNewReleases(allStarredRepos, newReleases) {
+export async function mergeNewReleases(allStarredRepoNames, newReleases) {
   const known = await getKnownReleases();
   const existing = await getPendingUpdates();
   const genuinelyNew = [];
 
+  const starredSet = new Set(allStarredRepoNames);
+
   for (const rel of newReleases) {
+    // 只处理当前仍被标星的仓库
+    if (!starredSet.has(rel.repo)) continue;
+
     const prev = known[rel.repo];
     if (!prev || prev !== rel.tag) {
       known[rel.repo] = rel.tag;
@@ -61,13 +66,16 @@ export async function mergeNewReleases(allStarredRepos, newReleases) {
     }
   }
 
-  const starredSet = new Set(allStarredRepos.map(r => r.full_name));
+  // 清理已取消标星的仓库
   for (const key of Object.keys(known)) {
     if (!starredSet.has(key)) delete known[key];
   }
 
-  const merged = [...genuinelyNew, ...existing];
-  // Deduplicate: keep only the latest entry per repo (by published_at)
+  // 过滤 pending_updates 中已取消标星的旧条目
+  const filteredExisting = existing.filter(entry => starredSet.has(entry.repo));
+  const merged = [...genuinelyNew, ...filteredExisting];
+
+  // 去重：每个仓库只保留最新一条
   const deduped = [];
   const seen = new Set();
   for (const entry of merged) {
