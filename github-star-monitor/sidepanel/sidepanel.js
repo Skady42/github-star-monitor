@@ -1,24 +1,70 @@
+import { translations } from '../utils/i18n.js';
+import { getLanguage, setLanguage } from '../utils/storage.js';
+
+let currentLang = 'zh';
+
+export function t(key) {
+  return translations[currentLang]?.[key] || translations.en[key] || key;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init();
 });
 
 async function init() {
-  // 显示 redirect URI
+  currentLang = await getLanguage();
+  document.getElementById('langSelect').value = currentLang;
+  applyLanguage();
+
   try {
     const uri = chrome.identity.getRedirectURL('oauth2');
-    document.getElementById('redirectUri').textContent = uri || '获取失败，请查看扩展ID';
+    document.getElementById('redirectUri').textContent = uri || '...';
   } catch (e) {
-    document.getElementById('redirectUri').textContent = '获取失败，请查看扩展ID';
+    document.getElementById('redirectUri').textContent = '...';
   }
 
   await loadStatus();
   setupEventListeners();
 }
 
+function applyLanguage() {
+  document.querySelector('.console-title').innerHTML = '<span>//</span> ' + t('title');
+  document.getElementById('settingsBtn').title = t('settings');
+  document.getElementById('backBtn').textContent = t('back');
+  document.querySelector('.settings-title').textContent = t('settings');
+  document.querySelectorAll('.settings-label')[0].textContent = t('scanInterval');
+  document.querySelectorAll('.settings-suffix')[0].textContent = t('min');
+  document.querySelector('.settings-hint').textContent = t('range');
+  document.getElementById('settingsSaveBtn').textContent = t('save');
+  document.querySelectorAll('.settings-label')[1].textContent = t('lang');
+  document.getElementById('checkBtn').textContent = t('scan');
+  document.querySelector('.search-input').placeholder = t('filter');
+
+  const sort = document.getElementById('sortSelect');
+  sort.options[0].textContent = t('sortNewest');
+  sort.options[1].textContent = t('sortOldest');
+  sort.options[2].textContent = t('sortAZ');
+  sort.options[3].textContent = t('sortZA');
+  sort.options[4].textContent = t('sortStarsDesc');
+  sort.options[5].textContent = t('sortStarsAsc');
+
+  document.getElementById('emptyState').innerHTML = '&#x25CB; ' + t('noUpdates');
+  document.getElementById('errorState').innerHTML = '&#x26A0; ' + t('networkUnreach');
+  document.getElementById('noTokenState').innerHTML = '&#x26A0; ' + t('noToken');
+  document.getElementById('logoutBtn').textContent = t('disconnect');
+
+  const hint = document.querySelector('.config-hint');
+  hint.innerHTML = t('configTitle') + '<ol><li><a href="https://github.com/settings/developers" target="_blank">' + t('stepCreate') + '</a></li><li>' + t('stepCallback') + '</li><li>' + t('stepFill') + '</li></ol>';
+  document.querySelector('.redirect-label').textContent = t('redirectLabel');
+  document.getElementById('copyRedirectBtn').textContent = t('copy');
+  document.querySelectorAll('.config-label')[0].textContent = t('clientId');
+  document.querySelectorAll('.config-label')[1].textContent = t('clientSecret');
+  document.getElementById('configSaveBtn').textContent = t('saveCreds');
+}
+
 async function loadStatus() {
   const status = await sendMessage({ action: 'getStatus' });
 
-  // 用 SW 返回的 redirectUri 覆盖（确保准确）
   if (status.redirectUri) {
     document.getElementById('redirectUri').textContent = status.redirectUri;
   }
@@ -37,25 +83,23 @@ async function loadStatus() {
   const noTokenState = document.getElementById('noTokenState');
 
   if (status.hasToken && status.user) {
-    // 已连接 GitHub
-    statusDot.classList.add('connected');
+    statusDot.classList.add('online');
     authConnected.style.display = 'flex';
-    authUser.textContent = '已连接: ' + status.user;
+    authUser.textContent = t('connected') + ': ' + status.user;
     authConfig.style.display = 'none';
     authBtn.style.display = 'none';
     checkBtn.disabled = false;
     logoutBtn.style.display = 'inline-block';
   } else if (status.hasCredentials) {
-    // 有凭证但未授权
-    statusDot.classList.remove('connected');
+    statusDot.classList.remove('online');
     authConnected.style.display = 'none';
     authConfig.style.display = 'none';
     authBtn.style.display = 'block';
+    authBtn.textContent = t('connect');
     checkBtn.disabled = true;
     logoutBtn.style.display = 'none';
   } else {
-    // 未配置凭证
-    statusDot.classList.remove('connected');
+    statusDot.classList.remove('online');
     authConnected.style.display = 'none';
     authConfig.style.display = 'block';
     authBtn.style.display = 'none';
@@ -65,17 +109,17 @@ async function loadStatus() {
 
   if (status.lastCheckTime) {
     const time = new Date(status.lastCheckTime);
-    checkTime.textContent = '上次检查: ' + getRelativeTime(time);
+    checkTime.textContent = t('lastScan') + ': ' + getRelativeTime(time);
   }
 
   if (status.status === 'success') {
-    checkResult.textContent = '成功';
+    checkResult.textContent = t('success');
     checkResult.className = 'check-result-success';
   } else if (status.status === 'network_error') {
-    checkResult.textContent = '网络不通';
+    checkResult.textContent = t('networkErr');
     checkResult.className = 'check-result-error';
   } else if (status.status === 'error') {
-    checkResult.textContent = '检查失败';
+    checkResult.textContent = t('checkFail');
     checkResult.className = 'check-result-error';
   }
 
@@ -160,20 +204,25 @@ function applyFilters() {
 }
 
 function setupEventListeners() {
-  // 搜索和排序
   document.getElementById('searchInput').addEventListener('input', applyFilters);
   document.getElementById('sortSelect').addEventListener('change', applyFilters);
 
-  // 复制回调地址
+  document.getElementById('langSelect').addEventListener('change', async () => {
+    currentLang = document.getElementById('langSelect').value;
+    await setLanguage(currentLang);
+    applyLanguage();
+    await loadStatus();
+  });
+
   document.getElementById('copyRedirectBtn').addEventListener('click', async () => {
     const uri = document.getElementById('redirectUri').textContent;
     try {
       await navigator.clipboard.writeText(uri);
       const btn = document.getElementById('copyRedirectBtn');
-      btn.textContent = '已复制';
+      btn.textContent = t('copied');
       btn.classList.add('copied');
       setTimeout(() => {
-        btn.textContent = '复制';
+        btn.textContent = t('copy');
         btn.classList.remove('copied');
       }, 2000);
     } catch {
@@ -181,14 +230,13 @@ function setupEventListeners() {
     }
   });
 
-  // 保存凭证
   document.getElementById('configSaveBtn').addEventListener('click', async () => {
     const clientId = document.getElementById('clientIdInput').value.trim();
     const clientSecret = document.getElementById('clientSecretInput').value.trim();
     const statusEl = document.getElementById('configStatus');
 
     if (!clientId || !clientSecret) {
-      statusEl.textContent = '请填写 Client ID 和 Client Secret';
+      statusEl.textContent = t('fillAll');
       statusEl.className = 'config-status error';
       return;
     }
@@ -200,38 +248,37 @@ function setupEventListeners() {
     });
 
     if (result.success) {
-      statusEl.textContent = '凭证已保存！';
+      statusEl.textContent = t('credsSaved');
       statusEl.className = 'config-status';
       await loadStatus();
     } else {
-      statusEl.textContent = '保存失败: ' + (result.error || '未知错误');
+      statusEl.textContent = 'FAILED: ' + (result.error || '');
       statusEl.className = 'config-status error';
     }
   });
 
-  // OAuth 连接
   document.getElementById('authBtn').addEventListener('click', async () => {
     const btn = document.getElementById('authBtn');
-    btn.textContent = '正在连接...';
+    btn.textContent = t('connecting');
     btn.disabled = true;
 
     const result = await sendMessage({ action: 'startOAuth' });
     if (result.success) {
       await loadStatus();
     } else {
-      btn.textContent = '连接失败，重试';
+      btn.textContent = t('retry');
       btn.disabled = false;
     }
   });
 
   document.getElementById('checkBtn').addEventListener('click', async () => {
     const btn = document.getElementById('checkBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spin">&#x21bb;</span> 检查中...';
+    const originalText = btn.textContent;
+    btn.textContent = t('scanning');
     btn.disabled = true;
 
     const result = await sendMessage({ action: 'checkNow' });
-    btn.innerHTML = originalText;
+    btn.textContent = originalText;
     btn.disabled = false;
 
     if (result.updates && result.updates.length > 0) {
@@ -245,7 +292,6 @@ function setupEventListeners() {
     await loadStatus();
   });
 
-  // 设置面板
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('settingsView').style.display = 'block';
@@ -262,7 +308,7 @@ function setupEventListeners() {
     const statusEl = document.getElementById('settingsStatus');
 
     if (isNaN(minutes) || minutes < 1 || minutes > 1440) {
-      statusEl.textContent = '请输入 1 ~ 1440 之间的数字';
+      statusEl.textContent = 'INVALID RANGE';
       statusEl.className = 'settings-status error';
       return;
     }
@@ -271,10 +317,10 @@ function setupEventListeners() {
     const result = await sendMessage({ action: 'saveSettings', interval: minutes });
 
     if (result.success) {
-      statusEl.textContent = '设置已保存';
+      statusEl.textContent = t('saved');
       statusEl.className = 'settings-status';
     } else {
-      statusEl.textContent = '保存失败';
+      statusEl.textContent = 'FAILED';
       statusEl.className = 'settings-status error';
     }
   });
@@ -299,11 +345,11 @@ function getRelativeTime(date) {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return minutes + '分钟前';
-  if (hours < 24) return hours + '小时前';
-  if (days < 30) return days + '天前';
-  return date.toLocaleDateString('zh-CN');
+  if (minutes < 1) return t('justNow');
+  if (minutes < 60) return minutes + t('minsAgo');
+  if (hours < 24) return hours + t('hrsAgo');
+  if (days < 30) return days + t('daysAgo');
+  return date.toLocaleDateString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
 }
 
 function formatDate(date) {

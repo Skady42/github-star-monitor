@@ -7,104 +7,112 @@
 </head>
 <body>
   <div id="app">
-    <header class="header">
-      <h1 class="title">GitHub Star Monitor</h1>
-      <div class="header-right">
-        <button class="settings-btn" id="settingsBtn" title="设置">&#x2699;</button>
-        <span class="status-dot" id="statusDot"></span>
-      </div>
-    </header>
 
     <div class="main-view" id="mainView">
+      <header class="console-header">
+        <h1 class="console-title"><span>//</span> STAR MONITOR</h1>
+        <div class="header-controls">
+          <button class="settings-btn" id="settingsBtn" title="SETTINGS">&#x2699;</button>
+          <span class="status-lamp" id="statusDot"></span>
+        </div>
+      </header>
 
-    <section class="auth-section" id="authSection">
-      <div class="auth-connected" id="authConnected" style="display:none">
-        <span class="connected-icon">&#9679;</span>
-        <span id="authUser">已连接</span>
-      </div>
-      <div class="auth-config" id="authConfig" style="display:none">
-        <div class="config-hint">
-          需要 <strong>GitHub OAuth App</strong> 凭证才能连接：
-          <ol>
-            <li><a href="https://github.com/settings/developers" target="_blank">创建 OAuth App</a></li>
-            <li>将下方的 <strong>Authorization callback URL</strong> 填进去</li>
-            <li>拿到 Client ID 和 Secret 后填入并保存</li>
-          </ol>
+      <section class="auth-section" id="authSection">
+        <div class="auth-connected" id="authConnected" style="display:none">
+          <span id="authUser">CONNECTED</span>
         </div>
-        <div class="redirect-box">
-          <div class="redirect-label">Authorization callback URL</div>
-          <code class="redirect-value" id="redirectUri">获取中...</code>
-          <button class="redirect-copy" id="copyRedirectBtn">复制</button>
+        <div class="auth-config" id="authConfig" style="display:none">
+          <div class="config-hint">
+            REQUIRED: GITHUB OAUTH APP CREDENTIALS
+            <ol>
+              <li><a href="https://github.com/settings/developers" target="_blank">CREATE OAUTH APP</a></li>
+              <li>SET CALLBACK URL BELOW</li>
+              <li>ENTER CLIENT ID + SECRET</li>
+            </ol>
+          </div>
+          <div class="redirect-box">
+            <div class="redirect-label">Authorization Callback URL</div>
+            <code class="redirect-value" id="redirectUri">FETCHING...</code>
+            <button class="redirect-copy" id="copyRedirectBtn">COPY</button>
+          </div>
+          <label class="config-label">Client ID</label>
+          <input class="config-input" type="text" id="clientIdInput" placeholder="Ov23li...">
+          <label class="config-label">Client Secret</label>
+          <input class="config-input" type="password" id="clientSecretInput" placeholder="••••••••">
+          <div class="config-actions">
+            <button class="config-save-btn" id="configSaveBtn">SAVE CREDENTIALS</button>
+          </div>
+          <div class="config-status" id="configStatus"></div>
         </div>
-        <label class="config-label">Client ID</label>
-        <input class="config-input" type="text" id="clientIdInput" placeholder="Ov23li...">
-        <label class="config-label">Client Secret</label>
-        <input class="config-input" type="password" id="clientSecretInput" placeholder="ghs_...">
-        <div class="config-actions">
-          <button class="config-save-btn" id="configSaveBtn">保存凭证</button>
-        </div>
-        <div class="config-status" id="configStatus"></div>
-      </div>
-      <button class="auth-btn" id="authBtn" style="display:none">连接 GitHub 账号</button>
-    </section>
+        <button class="auth-btn" id="authBtn" style="display:none">CONNECT GITHUB</button>
+      </section>
 
-    <section class="actions">
-      <button class="check-btn" id="checkBtn">
-        &#x21bb; 手动检查更新
-      </button>
-      <div class="check-status" id="checkStatus">
-        <span id="checkTime">上次检查: --</span>
-        <span id="checkResult"></span>
-      </div>
-    </section>
+      <section class="actions">
+        <button class="check-btn" id="checkBtn"></button>
+        <div class="check-status" id="checkStatus">
+          <span id="checkTime">LAST SCAN: --</span>
+          <span id="checkResult"></span>
+        </div>
+      </section>
 
-    <section class="updates-section">
-      <div class="list-toolbar">
-        <input class="search-input" type="text" id="searchInput" placeholder="搜索仓库名...">
-        <select class="sort-select" id="sortSelect">
-          <option value="newest">更新: 新→旧</option>
-          <option value="oldest">更新: 旧→新</option>
-          <option value="az">名称: A→Z</option>
-          <option value="za">名称: Z→A</option>
-          <option value="stars-desc">标星: 多→少</option>
-          <option value="stars-asc">标星: 少→多</option>
-        </select>
-      </div>
-      <div class="update-list" id="updateList">
-        <div class="empty-state" id="emptyState">
-          &#x1f7e2; 暂无更新
+      <section class="updates-section">
+        <div class="list-toolbar">
+          <input class="search-input" type="text" id="searchInput" placeholder="FILTER REPO...">
+          <select class="sort-select" id="sortSelect">
+            <option value="newest">NEWEST</option>
+            <option value="oldest">OLDEST</option>
+            <option value="az">A→Z</option>
+            <option value="za">Z→A</option>
+            <option value="stars-desc">STARS↓</option>
+            <option value="stars-asc">STARS↑</option>
+          </select>
         </div>
-        <div class="error-state" id="errorState" style="display:none">
-          &#x26a0; 网络连接失败，请检查代理后重试
+        <div class="update-list" id="updateList">
+          <div class="empty-state" id="emptyState">
+            &#x25CB; NO UPDATES
+          </div>
+          <div class="error-state" id="errorState" style="display:none">
+            &#x26A0; NETWORK UNREACHABLE
+          </div>
+          <div class="error-state" id="noTokenState" style="display:none">
+            &#x26A0; GITHUB NOT CONNECTED
+          </div>
         </div>
-        <div class="error-state" id="noTokenState" style="display:none">
-          &#x1f511; 请先连接 GitHub 账号
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <footer class="footer">
-      <button class="logout-btn" id="logoutBtn" style="display:none">退出登录</button>
-    </footer>
+      <footer class="footer">
+        <button class="logout-btn" id="logoutBtn" style="display:none">DISCONNECT</button>
+      </footer>
     </div>
 
     <div class="settings-view" id="settingsView" style="display:none">
       <div class="settings-header">
-        <button class="back-btn" id="backBtn">&#x2190; 返回</button>
-        <h2 class="settings-title">设置</h2>
+        <button class="back-btn" id="backBtn">&#x2190; BACK</button>
+        <h2 class="settings-title">SETTINGS</h2>
       </div>
       <div class="settings-body">
-        <label class="settings-label">间隔检查时间</label>
+        <label class="settings-label">SCAN INTERVAL</label>
         <div class="settings-row">
           <input class="settings-input" type="number" id="intervalInput" min="1" max="1440" value="60">
-          <span class="settings-suffix">分钟</span>
+          <span class="settings-suffix">MIN</span>
         </div>
-        <p class="settings-hint">范围 1 ~ 1440 分钟（1天）</p>
-        <button class="settings-save-btn" id="settingsSaveBtn">保存</button>
+        <p class="settings-hint">RANGE 1 ~ 1440</p>
+        <button class="settings-save-btn" id="settingsSaveBtn">SAVE</button>
         <div class="settings-status" id="settingsStatus"></div>
+
+        <div class="settings-divider"></div>
+
+        <label class="settings-label">LANGUAGE / 语言</label>
+        <div class="settings-row">
+          <select class="lang-select" id="langSelect">
+            <option value="en">ENGLISH</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
       </div>
     </div>
+
   </div>
-  <script src="sidepanel.js"></script>
+  <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

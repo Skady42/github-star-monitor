@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   LAST_CHECK_STATUS: 'last_check_status',
   OAUTH_CLIENT_ID: 'oauth_client_id',
   OAUTH_CLIENT_SECRET: 'oauth_client_secret',
-  CHECK_INTERVAL: 'check_interval'
+  CHECK_INTERVAL: 'check_interval',
+  LANG: 'language'
 };
 
 export async function getToken() {
@@ -121,4 +122,13 @@ export async function getCheckInterval() {
 
 export async function setCheckInterval(minutes) {
   await chrome.storage.local.set({ [STORAGE_KEYS.CHECK_INTERVAL]: minutes });
+}
+
+export async function getLanguage() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.LANG);
+  return result[STORAGE_KEYS.LANG] || 'zh';
+}
+
+export async function setLanguage(lang) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.LANG]: lang });
 }
