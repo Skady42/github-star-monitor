@@ -9,8 +9,13 @@
   <div id="app">
     <header class="header">
       <h1 class="title">GitHub Star Monitor</h1>
-      <span class="status-dot" id="statusDot"></span>
+      <div class="header-right">
+        <button class="settings-btn" id="settingsBtn" title="设置">&#x2699;</button>
+        <span class="status-dot" id="statusDot"></span>
+      </div>
     </header>
+
+    <div class="main-view" id="mainView">
 
     <section class="auth-section" id="authSection">
       <div class="auth-connected" id="authConnected" style="display:none">
@@ -81,6 +86,24 @@
     <footer class="footer">
       <button class="logout-btn" id="logoutBtn" style="display:none">退出登录</button>
     </footer>
+    </div>
+
+    <div class="settings-view" id="settingsView" style="display:none">
+      <div class="settings-header">
+        <button class="back-btn" id="backBtn">&#x2190; 返回</button>
+        <h2 class="settings-title">设置</h2>
+      </div>
+      <div class="settings-body">
+        <label class="settings-label">间隔检查时间</label>
+        <div class="settings-row">
+          <input class="settings-input" type="number" id="intervalInput" min="1" max="1440" value="60">
+          <span class="settings-suffix">分钟</span>
+        </div>
+        <p class="settings-hint">范围 1 ~ 1440 分钟（1天）</p>
+        <button class="settings-save-btn" id="settingsSaveBtn">保存</button>
+        <div class="settings-status" id="settingsStatus"></div>
+      </div>
+    </div>
   </div>
   <script src="sidepanel.js"></script>
 </body>

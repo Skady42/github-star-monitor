@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   PENDING_UPDATES: 'pending_updates',
   LAST_CHECK_STATUS: 'last_check_status',
   OAUTH_CLIENT_ID: 'oauth_client_id',
-  OAUTH_CLIENT_SECRET: 'oauth_client_secret'
+  OAUTH_CLIENT_SECRET: 'oauth_client_secret',
+  CHECK_INTERVAL: 'check_interval'
 };
 
 export async function getToken() {
@@ -65,9 +66,18 @@ export async function mergeNewReleases(allStarredRepos, newReleases) {
   }
 
   const merged = [...genuinelyNew, ...existing];
+  // Deduplicate: keep only the latest entry per repo (by published_at)
+  const deduped = [];
+  const seen = new Set();
+  for (const entry of merged) {
+    if (seen.has(entry.repo)) continue;
+    seen.add(entry.repo);
+    deduped.push(entry);
+  }
+
   await chrome.storage.local.set({
     [STORAGE_KEYS.KNOWN_RELEASES]: known,
-    [STORAGE_KEYS.PENDING_UPDATES]: merged
+    [STORAGE_KEYS.PENDING_UPDATES]: deduped
   });
 
   return genuinelyNew;
@@ -102,4 +112,13 @@ export async function getOAuthClientSecret() {
 
 export async function setOAuthClientSecret(secret) {
   await chrome.storage.local.set({ [STORAGE_KEYS.OAUTH_CLIENT_SECRET]: secret });
+}
+
+export async function getCheckInterval() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.CHECK_INTERVAL);
+  return result[STORAGE_KEYS.CHECK_INTERVAL] || 60; // default 60 minutes
+}
+
+export async function setCheckInterval(minutes) {
+  await chrome.storage.local.set({ [STORAGE_KEYS.CHECK_INTERVAL]: minutes });
 }

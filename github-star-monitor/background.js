@@ -4,7 +4,8 @@ import {
   getKnownReleases, getPendingUpdates, mergeNewReleases,
   getLastCheckStatus, setLastCheckStatus,
   getOAuthClientId, setOAuthClientId,
-  getOAuthClientSecret, setOAuthClientSecret
+  getOAuthClientSecret, setOAuthClientSecret,
+  getCheckInterval, setCheckInterval
 } from './utils/storage.js';
 
 import {
@@ -14,7 +15,6 @@ import {
 import { notifyUpdates } from './utils/notifications.js';
 
 const ALARM_NAME = 'check-releases';
-const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const GITHUB_OAUTH = {
   authUrl: 'https://github.com/login/oauth/authorize',
@@ -22,17 +22,20 @@ const GITHUB_OAUTH = {
 };
 
 function setupAlarm() {
-  chrome.alarms.clear(ALARM_NAME, () => {
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-    const delayMinutes = (nextHour - now) / 60000;
+  getCheckInterval().then(interval => {
+    const periodMinutes = Math.max(1, Math.min(1440, interval));
+    chrome.alarms.clear(ALARM_NAME, () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const delayMinutes = Math.max(1, (nextHour - now) / 60000);
 
-    chrome.alarms.create(ALARM_NAME, {
-      periodInMinutes: 60,
-      delayInMinutes: delayMinutes
+      chrome.alarms.create(ALARM_NAME, {
+        periodInMinutes: periodMinutes,
+        delayInMinutes: delayMinutes
+      });
+      console.log(`[Monitor] Alarm set for ${nextHour.toISOString()} (interval: ${periodMinutes}min)`);
     });
-    console.log(`[Monitor] Alarm set for ${nextHour.toISOString()} (in ${Math.round(delayMinutes)}min)`);
   });
 }
 
@@ -161,9 +164,16 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
-    performCheck();
+    const lastCheckTime = await getLastCheckTime();
+    const interval = await getCheckInterval();
+    const intervalMs = interval * 60 * 1000;
+    if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > intervalMs) {
+      await performCheck();
+    } else {
+      console.log('[Monitor] Skipping check: last check was too recent');
+    }
   }
 });
 
@@ -197,11 +207,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const token = await getToken();
         const hasCreds = !!(await getOAuthClientId() && await getOAuthClientSecret());
         const redirUri = chrome.identity.getRedirectURL('oauth2');
-        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds, redirectUri: redirUri });
+        const checkInterval = await getCheckInterval();
+        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds, redirectUri: redirUri, checkInterval });
         break;
 
       case 'logout':
         await chrome.storage.local.clear();
+        sendResponse({ success: true });
+        break;
+
+      case 'saveSettings':
+        const minutes = parseInt(message.interval) || 60;
+        await setCheckInterval(Math.max(1, Math.min(1440, minutes)));
+        setupAlarm();
         sendResponse({ success: true });
         break;
 
@@ -217,7 +235,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   setupAlarm();
 
   const lastCheckTime = await getLastCheckTime();
-  if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > ONE_HOUR_MS) {
+  const interval = await getCheckInterval();
+  if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > interval * 60 * 1000) {
     await performCheck();
   }
 });
@@ -227,7 +246,8 @@ chrome.runtime.onStartup.addListener(async () => {
   setupAlarm();
 
   const lastCheckTime = await getLastCheckTime();
-  if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > ONE_HOUR_MS) {
+  const interval = await getCheckInterval();
+  if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > interval * 60 * 1000) {
     await performCheck();
   }
 });

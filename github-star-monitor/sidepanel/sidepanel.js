@@ -79,6 +79,10 @@ async function loadStatus() {
     checkResult.className = 'check-result-error';
   }
 
+  if (status.checkInterval) {
+    document.getElementById('intervalInput').value = status.checkInterval;
+  }
+
   if (!status.hasToken) {
     noTokenState.style.display = 'block';
     emptyState.style.display = 'none';
@@ -120,10 +124,10 @@ function applyFilters() {
 
   switch (sortMode) {
     case 'newest':
-      filtered.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+      filtered.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
       break;
     case 'oldest':
-      filtered.sort((a, b) => new Date(a.detected_at) - new Date(b.detected_at));
+      filtered.sort((a, b) => new Date(a.published_at) - new Date(b.published_at));
       break;
     case 'az':
       filtered.sort((a, b) => a.repo.toLowerCase().localeCompare(b.repo.toLowerCase()));
@@ -239,6 +243,40 @@ function setupEventListeners() {
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await sendMessage({ action: 'logout' });
     await loadStatus();
+  });
+
+  // 设置面板
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    document.getElementById('mainView').style.display = 'none';
+    document.getElementById('settingsView').style.display = 'block';
+  });
+
+  document.getElementById('backBtn').addEventListener('click', () => {
+    document.getElementById('settingsView').style.display = 'none';
+    document.getElementById('mainView').style.display = 'block';
+  });
+
+  document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
+    const input = document.getElementById('intervalInput');
+    const minutes = parseInt(input.value);
+    const statusEl = document.getElementById('settingsStatus');
+
+    if (isNaN(minutes) || minutes < 1 || minutes > 1440) {
+      statusEl.textContent = '请输入 1 ~ 1440 之间的数字';
+      statusEl.className = 'settings-status error';
+      return;
+    }
+
+    input.value = Math.max(1, Math.min(1440, minutes));
+    const result = await sendMessage({ action: 'saveSettings', interval: minutes });
+
+    if (result.success) {
+      statusEl.textContent = '设置已保存';
+      statusEl.className = 'settings-status';
+    } else {
+      statusEl.textContent = '保存失败';
+      statusEl.className = 'settings-status error';
+    }
   });
 }
 
