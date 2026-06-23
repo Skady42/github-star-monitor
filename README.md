@@ -1,5 +1,7 @@
 # GitHub Star Release Monitor
 
+> **⚠️ 作者用 AI 搓的自用小工具**，水平有限，如果遇到 bug 或者体验不佳，**轻点喷 😅** 有问题欢迎提 Issue，看到会尽量修。
+
 > 监控 GitHub Star 仓库的新 Release，整点自动检查并推送系统通知
 
 ## 功能
