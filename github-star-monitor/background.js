@@ -147,10 +147,7 @@ async function startOAuth() {
   }
 }
 
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
-});
-
+// Click action icon -> open side panel (setPanelBehavior handles this)
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
