@@ -73,14 +73,12 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
   }
 
   if (genuinelyNew.length > 0) {
-    // 合并旧 pending + 新 release，按 repo 去重保留最新
+    // 合并旧 pending + 新 release，按 repo 去重：同仓库只保留 genuinelyNew（最新发现）
     const existing = await getPendingUpdates();
+    const newRepos = new Set(genuinelyNew.map(r => r.repo));
     const merged = [...genuinelyNew];
-    const seenTags = new Set(genuinelyNew.map(r => `${r.repo}::${r.tag}`));
     for (const entry of existing) {
-      const key = `${entry.repo}::${entry.tag}`;
-      if (!seenTags.has(key) && starredSet.has(entry.repo)) {
-        seenTags.add(key);
+      if (!newRepos.has(entry.repo) && starredSet.has(entry.repo)) {
         merged.push(entry);
       }
     }
