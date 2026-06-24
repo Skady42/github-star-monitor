@@ -20,6 +20,9 @@ import { debug as logDebug, info as logInfo, warn as logWarn, error as logError 
 const ALARM_NAME = 'check-releases';
 const CONCURRENCY = 3;
 
+// 内存锁：防止 performCheck 并发执行（两个检查同时写 storage 会互相覆盖）
+let _isChecking = false;
+
 const GITHUB_OAUTH = {
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenUrl: 'https://github.com/login/oauth/access_token'
@@ -54,7 +57,14 @@ function setupAlarm() {
 }
 
 async function performCheck() {
-  logInfo('check_start', '开始检查更新');
+  if (_isChecking) {
+    logWarn('check_skip_concurrent', '有检查正在运行，跳过本次');
+    return;
+  }
+  _isChecking = true;
+
+  try {
+    logInfo('check_start', '开始检查更新');
 
   const token = await getToken();
   if (!token) {
@@ -122,6 +132,9 @@ async function performCheck() {
   } catch (err) {
     logError('check_failed', '检查失败', { error: err.message });
     await setLastCheckStatus('error');
+  }
+  } finally {
+    _isChecking = false;
   }
 }
 
@@ -204,9 +217,14 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const interval = await getCheckInterval();
     const intervalMs = interval * 60 * 1000;
     if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > intervalMs) {
+      // 额外防御：如果距上次检查不到 30 秒，跳过（防止浏览器启动时的双触发）
+      if (lastCheckTime && (Date.now() - new Date(lastCheckTime).getTime()) < 30000) {
+        logWarn('check_skip_alarm_recent', '上次检查不到 30 秒，跳过 alarm 触发');
+        return;
+      }
       await performCheck();
     } else {
-      console.log('[Monitor] Skipping check: last check was too recent');
+      logWarn('check_skip_alarm', `上次检查在间隔内，跳过 (${Math.round((Date.now() - new Date(lastCheckTime).getTime()) / 1000)}s ago)`);
     }
   }
 });
@@ -310,6 +328,11 @@ chrome.runtime.onStartup.addListener(async () => {
   const lastCheckTime = await getLastCheckTime();
   const interval = await getCheckInterval();
   if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > interval * 60 * 1000) {
+    // 安装时已设置 lastCheckTime，如果距上次检查不到 60 秒，跳过启动检查
+    if (lastCheckTime && (Date.now() - new Date(lastCheckTime).getTime()) < 60000) {
+      logWarn('check_skip_startup_recent', '距上次检查不到 60 秒，跳过启动检查');
+      return;
+    }
     await performCheck();
   }
 });

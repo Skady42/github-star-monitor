@@ -72,12 +72,31 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
     if (!starredSet.has(key)) delete known[key];
   }
 
-  // ✅ 每次扫描替换 pending_updates 为 genuinelyNew，不合并旧的
-  // 避免 pending_updates 只增不减的累积问题
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.KNOWN_RELEASES]: known,
-    [STORAGE_KEYS.PENDING_UPDATES]: genuinelyNew
-  });
+  if (genuinelyNew.length > 0) {
+    // 合并旧 pending + 新 release，按 repo 去重保留最新
+    const existing = await getPendingUpdates();
+    const merged = [...genuinelyNew];
+    const seenTags = new Set(genuinelyNew.map(r => `${r.repo}::${r.tag}`));
+    for (const entry of existing) {
+      const key = `${entry.repo}::${entry.tag}`;
+      if (!seenTags.has(key) && starredSet.has(entry.repo)) {
+        seenTags.add(key);
+        merged.push(entry);
+      }
+    }
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.KNOWN_RELEASES]: known,
+      [STORAGE_KEYS.PENDING_UPDATES]: merged
+    });
+  } else {
+    // 没有新 Release，只更新 known（取消标星的清理）和 pending（取消标星的清理）
+    const existing = await getPendingUpdates();
+    const filtered = existing.filter(entry => starredSet.has(entry.repo));
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.KNOWN_RELEASES]: known,
+      [STORAGE_KEYS.PENDING_UPDATES]: filtered
+    });
+  }
 
   return genuinelyNew;
 }
