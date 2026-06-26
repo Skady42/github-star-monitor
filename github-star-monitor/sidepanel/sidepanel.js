@@ -1,12 +1,8 @@
-import { translations } from '../utils/i18n.js';
+import { t, setLang, getLang } from '../utils/i18n.js';
 import { getLanguage, setLanguage } from '../utils/storage.js';
 import { getLogs, clearLogs, exportLogs } from '../utils/logger.js';
 
 let currentLang = 'zh';
-
-export function t(key) {
-  return translations[currentLang]?.[key] || translations.en[key] || key;
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
@@ -14,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function init() {
   currentLang = await getLanguage();
+  setLang(currentLang);
   document.getElementById('langSelect').value = currentLang;
   applyLanguage();
 
@@ -73,6 +70,19 @@ function applyLanguage() {
 
 async function loadStatus() {
   const status = await sendMessage({ action: 'getStatus' });
+
+  // 如果状态是旧的 network_error（上次检查超过 1 分钟），自动触发一次重试
+  if (status.status === 'network_error' && status.lastCheckTime) {
+    const age = Date.now() - new Date(status.lastCheckTime).getTime();
+    if (age > 60000) {
+      const result = await sendMessage({ action: 'checkNow' });
+      if (result.status !== 'network_error') {
+        status.status = result.status;
+        status.updates = result.updates;
+        status.lastCheckTime = result.lastCheckTime;
+      }
+    }
+  }
 
   if (status.redirectUri) {
     document.getElementById('redirectUri').textContent = status.redirectUri;
@@ -198,7 +208,7 @@ function applyFilters() {
 
   filtered.forEach(update => {
     const a = document.createElement('a');
-    a.className = 'update-item';
+    a.className = 'update-item' + (update.read ? ' read' : '');
     a.href = update.url;
     a.target = '_blank';
     a.innerHTML = `
@@ -208,8 +218,22 @@ function applyFilters() {
         <span class="update-item-date">${formatDate(new Date(update.published_at))}</span>
       </div>
     `;
+    if (!update.read) {
+      a.addEventListener('click', async (e) => {
+        if (!update.read) {
+          update.read = true;
+          a.classList.add('read');
+          await sendMessage({ action: 'markAsRead', repo: update.repo });
+        }
+      });
+    }
     updateList.appendChild(a);
   });
+
+  if (filtered.length === 0 && currentUpdates.length > 0) {
+    emptyState.innerHTML = '&#x25CB; ' + t('noUpdatesFiltered');
+    emptyState.style.display = 'block';
+  }
 }
 
 async function updateLogStats() {
@@ -224,6 +248,7 @@ function setupEventListeners() {
 
   document.getElementById('langSelect').addEventListener('change', async () => {
     currentLang = document.getElementById('langSelect').value;
+    setLang(currentLang);
     await setLanguage(currentLang);
     applyLanguage();
     await loadStatus();

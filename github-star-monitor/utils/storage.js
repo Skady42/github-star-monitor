@@ -1,4 +1,4 @@
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   TOKEN: 'github_token',
   USER: 'github_user',
   LAST_CHECK_TIME: 'last_check_time',
@@ -63,7 +63,7 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
     const prev = known[rel.repo];
     if (!prev || prev !== rel.tag) {
       known[rel.repo] = rel.tag;
-      genuinelyNew.push({ ...rel, detected_at: new Date().toISOString() });
+      genuinelyNew.push({ ...rel, detected_at: new Date().toISOString(), read: false });
     }
   }
 
@@ -100,10 +100,6 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
 }
 
 export async function clearUpdates() {
-  await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: [] });
-}
-
-export async function clearPendingUpdates() {
   await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: [] });
 }
 
@@ -159,4 +155,10 @@ export async function getReleaseEtags() {
 
 export async function setReleaseEtags(etags) {
   await chrome.storage.local.set({ [STORAGE_KEYS.RELEASE_ETAGS]: etags });
+}
+
+export async function markAsRead(repo) {
+  const updates = await getPendingUpdates();
+  const updated = updates.map(u => u.repo === repo ? { ...u, read: true } : u);
+  await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: updated });
 }

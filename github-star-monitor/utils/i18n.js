@@ -51,7 +51,17 @@ export const translations = {
     exportLog: '导出日志',
     clearLog: '清空日志',
     noLogs: '暂无日志',
-    logExported: '日志已导出'
+    logExported: '日志已导出',
+    releaseNew: '发布新 Release',
+    releaseMulti: '个仓库有新 Release',
+    foundNew: '找到',
+    releaseCount: '个新 Release',
+    scanComplete: '扫描完成，无新 Release',
+    checked: '检查了',
+    repos: '个仓库',
+    took: '耗时',
+    seconds: '秒',
+    noUpdatesFiltered: '无匹配结果'
   },
   en: {
     title: 'STAR MONITOR',
@@ -105,6 +115,30 @@ export const translations = {
     exportLog: 'EXPORT LOG',
     clearLog: 'CLEAR LOG',
     noLogs: 'NO LOG ENTRIES',
-    logExported: 'LOG EXPORTED'
+    logExported: 'LOG EXPORTED',
+    releaseNew: 'released new version',
+    releaseMulti: 'repos have new releases',
+    foundNew: 'Found',
+    releaseCount: 'new releases',
+    scanComplete: 'Scan complete, no new releases',
+    checked: 'Checked',
+    repos: 'repos',
+    took: 'in',
+    seconds: 'seconds',
+    noUpdatesFiltered: 'No matching results'
   }
 };
+
+let _currentLang = 'zh';
+
+export function setLang(lang) {
+  _currentLang = lang;
+}
+
+export function getLang() {
+  return _currentLang;
+}
+
+export function t(key) {
+  return translations[_currentLang]?.[key] || translations.en[key] || key;
+}

@@ -1,27 +1,28 @@
-/* === GitHub Star Monitor — Industrial Console Theme === */
+/* === GitHub Star Monitor — Newsprint Theme === */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Lora:wght@400;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=block');
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  border-radius: 0 !important;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Lora', Georgia, serif;
   font-size: 13px;
-  color: #e4e4e7;
-  background: #0b0d11;
+  color: #111111;
+  background: #F9F9F7;
   min-height: 100vh;
+  line-height: 1.5;
 }
 
 #app {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23111111' fill-opacity='0.03' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
 }
 
 /* === Header === */
@@ -32,20 +33,22 @@ body {
   justify-content: space-between;
   height: 48px;
   padding: 0 16px;
-  background: #09090b;
-  border-bottom: 1px solid #27272a;
+  background: #111111;
+  border-bottom: 4px solid #CC0000;
 }
 
 .console-title {
-  font-size: 13px;
-  font-weight: 700;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-size: 15px;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #e4e4e7;
+  letter-spacing: 0.15em;
+  color: #F9F9F7;
 }
 
 .console-title span {
-  color: #d97706;
+  color: #CC0000;
+  font-weight: 400;
 }
 
 .header-controls {
@@ -55,160 +58,170 @@ body {
 }
 
 .status-lamp {
-  width: 6px;
-  height: 6px;
-  border-radius: 0;
-  background: #52525b;
+  width: 8px;
+  height: 8px;
+  background: #CC0000;
+  border: 1px solid #F9F9F7;
 }
 
 .status-lamp.online {
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16,185,129,0.5);
+  background: #22863a;
 }
 
 .settings-btn {
   background: none;
-  border: 1px solid #27272a;
-  color: #71717a;
-  font-size: 15px;
+  border: 1px solid #F9F9F7;
+  color: #F9F9F7;
+  font-size: 14px;
   cursor: pointer;
-  padding: 3px 6px;
+  padding: 4px 8px;
   line-height: 1;
+  transition: all 0.15s ease-out;
 }
 
 .settings-btn:hover {
-  color: #d97706;
-  border-color: #d97706;
+  background: #F9F9F7;
+  color: #111111;
 }
 
 /* === Auth Section === */
 
 .auth-section {
-  margin: 12px 16px 0;
-  padding: 12px;
-  background: #111827;
-  border: 1px solid #27272a;
-  border-radius: 4px;
+  margin: 0;
+  padding: 12px 16px;
+  background: #F5F5F5;
+  border-bottom: 1px solid #111111;
 }
 
 .auth-connected {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: #10b981;
-  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #111111;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
 }
 
 .auth-connected::before {
   content: '';
-  width: 6px;
-  height: 6px;
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16,185,129,0.5);
+  width: 8px;
+  height: 8px;
+  background: #22863a;
+  display: inline-block;
 }
 
 /* OAuth Config */
 
-.auth-config { }
-
 .config-hint {
-  font-size: 11px;
-  color: #a1a1aa;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: #525252;
   margin-bottom: 10px;
   line-height: 1.6;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .config-hint ol {
-  padding-left: 18px;
+  padding-left: 16px;
   margin: 6px 0;
+  color: #111111;
 }
 
 .config-hint a {
-  color: #d97706;
+  color: #CC0000;
   text-decoration: none;
-  border-bottom: 1px solid #d97706;
+  border-bottom: 1px solid #CC0000;
+  transition: all 0.15s ease-out;
+}
+
+.config-hint a:hover {
+  background: #CC0000;
+  color: #F9F9F7;
 }
 
 .redirect-box {
-  background: #09090b;
-  border: 1px solid #d97706;
+  background: #F9F9F7;
+  border: 2px solid #111111;
   padding: 10px 12px;
   margin-bottom: 12px;
 }
 
 .redirect-label {
-  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #d97706;
+  letter-spacing: 0.12em;
+  color: #111111;
   margin-bottom: 4px;
 }
 
 .redirect-value {
   display: block;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
-  color: #fbbf24;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #525252;
   word-break: break-all;
   margin-bottom: 6px;
 }
 
 .redirect-copy {
-  padding: 3px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: #d97706;
-  color: #0b0d11;
-  border: none;
-  cursor: pointer;
-  border-radius: 2px;
-}
-
-.redirect-copy:hover {
-  background: #f59e0b;
-}
-
-.redirect-copy.copied {
-  background: #10b981;
-}
-
-.config-label {
-  display: block;
+  padding: 4px 12px;
+  font-family: 'Inter', sans-serif;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #a1a1aa;
+  background: #111111;
+  color: #F9F9F7;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.redirect-copy:hover {
+  background: #CC0000;
+}
+
+.redirect-copy.copied {
+  background: #111111;
+}
+
+.config-label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #525252;
   margin-bottom: 4px;
   margin-top: 10px;
 }
 
 .config-input {
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   font-size: 12px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  background: #09090b;
-  color: #e4e4e7;
-  border: 1px solid #27272a;
+  font-family: 'JetBrains Mono', monospace;
+  background: #F9F9F7;
+  color: #111111;
+  border: none;
+  border-bottom: 2px solid #111111;
   outline: none;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .config-input:focus {
-  border-color: #d97706;
+  background: #F0F0F0;
 }
 
 .config-input::placeholder {
-  color: #52525b;
+  color: #A3A3A3;
 }
 
 .config-actions {
@@ -220,77 +233,81 @@ body {
 .config-save-btn {
   flex: 1;
   padding: 8px 16px;
-  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: #18181b;
-  color: #e4e4e7;
-  border: 1px solid #27272a;
+  letter-spacing: 0.12em;
+  background: #F9F9F7;
+  color: #111111;
+  border: 1px solid #111111;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .config-save-btn:hover {
-  background: #27272a;
-  border-color: #d97706;
-  color: #d97706;
+  background: #111111;
+  color: #F9F9F7;
 }
 
 .config-status {
   margin-top: 8px;
-  font-size: 11px;
-  color: #10b981;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #111111;
 }
 
 .config-status.error {
-  color: #ef4444;
+  color: #CC0000;
 }
 
 /* Auth button */
 
 .auth-btn {
   width: 100%;
-  padding: 8px 16px;
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: #d97706;
-  color: #0b0d11;
+  letter-spacing: 0.12em;
+  background: #111111;
+  color: #F9F9F7;
   border: none;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .auth-btn:hover {
-  background: #f59e0b;
+  background: #CC0000;
 }
 
 /* === Actions === */
 
 .actions {
-  margin: 12px 16px 0;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #111111;
 }
 
 .check-btn {
   width: 100%;
-  padding: 8px 16px;
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: #18181b;
-  color: #e4e4e7;
-  border: 1px solid #27272a;
+  letter-spacing: 0.12em;
+  background: #F9F9F7;
+  color: #111111;
+  border: 2px solid #111111;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .check-btn:hover {
-  border-color: #d97706;
-  color: #d97706;
+  background: #111111;
+  color: #F9F9F7;
 }
 
 .check-btn:disabled {
@@ -303,22 +320,20 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-top: 8px;
-  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #71717a;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  letter-spacing: 0.1em;
+  color: #737373;
 }
 
-.check-result-success { color: #10b981; }
-.check-result-error { color: #ef4444; }
-.check-result-warning { color: #d97706; }
+.check-result-success { color: #111111; font-weight: 700; }
+.check-result-error { color: #CC0000; font-weight: 700; }
 
 /* === Updates Section === */
 
 .updates-section {
   flex: 1;
-  margin: 12px 16px 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -326,47 +341,49 @@ body {
 
 .list-toolbar {
   display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 0;
+  border-bottom: 2px solid #111111;
 }
 
 .search-input {
   flex: 2;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  background: #09090b;
-  color: #e4e4e7;
-  border: 1px solid #27272a;
+  background: #F9F9F7;
+  color: #111111;
+  border: none;
+  border-right: 1px solid #111111;
   outline: none;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .search-input:focus {
-  border-color: #d97706;
+  background: #F0F0F0;
 }
 
 .search-input::placeholder {
-  color: #52525b;
+  color: #A3A3A3;
 }
 
 .sort-select {
   flex: 1;
-  padding: 5px 8px;
-  font-size: 10px;
+  padding: 8px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: #09090b;
-  color: #a1a1aa;
-  border: 1px solid #27272a;
+  letter-spacing: 0.08em;
+  background: #F9F9F7;
+  color: #111111;
+  border: none;
   outline: none;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
-.sort-select:focus {
-  border-color: #d97706;
+.sort-select:hover {
+  background: #E5E5E0;
 }
 
 .update-list {
@@ -378,29 +395,28 @@ body {
 
 .update-item {
   display: block;
-  padding: 10px 12px;
-  background: #111827;
-  border: 1px solid #27272a;
-  margin-bottom: 4px;
+  padding: 12px 16px;
+  background: #F9F9F7;
+  border-bottom: 1px solid #E5E5E0;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  border-radius: 2px;
-  overflow: hidden;
+  transition: all 0.15s ease-out;
 }
 
 .update-item:hover {
-  border-color: #d97706;
-  background: #18181b;
+  background: #F5F5F5;
+  border-left: 3px solid #CC0000;
+  padding-left: 13px;
 }
 
 .update-item-repo {
-  font-size: 12px;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-size: 13px;
   font-weight: 700;
-  color: #e4e4e7;
+  color: #111111;
   margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .update-item-meta {
@@ -410,18 +426,27 @@ body {
 }
 
 .update-item-tag {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  color: #d97706;
-  background: #1c1917;
-  padding: 1px 6px;
-  border: 1px solid #d97706;
+  color: #CC0000;
+  background: #F5F5F5;
+  padding: 2px 8px;
+  border: 1px solid #CC0000;
 }
 
 .update-item-date {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  color: #71717a;
+  color: #737373;
+}
+
+.update-item.read {
+  opacity: 0.4;
+}
+
+.update-item.read .update-item-repo {
+  color: #737373;
+  font-weight: 400;
 }
 
 /* States */
@@ -429,70 +454,75 @@ body {
 .empty-state, .error-state {
   padding: 32px 16px;
   text-align: center;
-  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #71717a;
-  background: #111827;
-  border: 1px solid #27272a;
-  border-radius: 2px;
+  letter-spacing: 0.12em;
+  color: #737373;
+  background: #F5F5F5;
+  border-bottom: 1px solid #E5E5E0;
 }
 
 .error-state {
-  color: #ef4444;
-  border-color: #ef4444;
-  background: #1c1917;
+  color: #CC0000;
+  border-left: 3px solid #CC0000;
+  background: #F9F9F7;
 }
 
 /* === Settings View === */
 
 .settings-view {
-  padding: 16px;
+  padding: 0;
 }
 
 .settings-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 0;
+  border-bottom: 2px solid #111111;
 }
 
 .back-btn {
-  background: none;
-  border: 1px solid #27272a;
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 12px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #71717a;
+  letter-spacing: 0.1em;
+  background: none;
+  color: #737373;
+  border: none;
+  border-right: 1px solid #111111;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .back-btn:hover {
-  color: #d97706;
-  border-color: #d97706;
+  background: #111111;
+  color: #F9F9F7;
 }
 
 .settings-title {
-  font-size: 13px;
-  font-weight: 700;
+  padding: 12px 16px;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #e4e4e7;
+  color: #111111;
 }
 
 .settings-body {
-  max-width: 300px;
+  padding: 16px;
 }
 
 .settings-label {
   display: block;
-  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #a1a1aa;
+  letter-spacing: 0.12em;
+  color: #525252;
   margin-bottom: 6px;
 }
 
@@ -504,16 +534,21 @@ body {
 
 .settings-input {
   width: 72px;
-  padding: 5px 10px;
+  padding: 6px 10px;
   font-size: 14px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  background: #09090b;
-  color: #fbbf24;
-  border: 1px solid #27272a;
+  font-family: 'JetBrains Mono', monospace;
+  background: #F9F9F7;
+  color: #111111;
+  border: none;
+  border-bottom: 2px solid #111111;
   outline: none;
   text-align: center;
-  border-radius: 2px;
   -moz-appearance: textfield;
+  transition: all 0.15s ease-out;
+}
+
+.settings-input:focus {
+  background: #F0F0F0;
 }
 
 .settings-input::-webkit-inner-spin-button,
@@ -522,122 +557,111 @@ body {
   margin: 0;
 }
 
-.settings-input:focus {
-  border-color: #d97706;
-}
-
 .settings-suffix {
-  font-size: 12px;
-  color: #71717a;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #737373;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .settings-hint {
-  font-size: 10px;
-  color: #52525b;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  color: #A3A3A3;
   margin-top: 4px;
   margin-bottom: 16px;
 }
 
 .settings-save-btn {
   width: 100%;
-  padding: 8px 16px;
-  font-size: 11px;
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: #d97706;
-  color: #0b0d11;
+  letter-spacing: 0.12em;
+  background: #111111;
+  color: #F9F9F7;
   border: none;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .settings-save-btn:hover {
-  background: #f59e0b;
+  background: #CC0000;
 }
 
 .settings-status {
   margin-top: 8px;
-  font-size: 11px;
-  color: #10b981;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #111111;
 }
 
 .settings-status.error {
-  color: #ef4444;
+  color: #CC0000;
 }
 
 .settings-divider {
   height: 1px;
-  background: #27272a;
+  background: #E5E5E0;
   margin: 20px 0;
 }
 
 .lang-select {
-  padding: 5px 8px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  background: #09090b;
-  color: #a1a1aa;
-  border: 1px solid #27272a;
+  background: #F9F9F7;
+  color: #111111;
+  border: 1px solid #111111;
   outline: none;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
-.lang-select:focus {
-  border-color: #d97706;
+.lang-select:hover {
+  background: #111111;
+  color: #F9F9F7;
 }
 
 /* === Footer === */
 
 .footer {
-  margin: 12px 16px;
-  padding-top: 12px;
-  border-top: 1px solid #27272a;
+  padding: 12px 16px;
+  border-top: 2px solid #111111;
   display: flex;
   justify-content: flex-end;
 }
 
 .logout-btn {
-  padding: 4px 12px;
-  font-size: 10px;
+  padding: 6px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   background: none;
-  color: #71717a;
-  border: 1px solid #27272a;
+  color: #737373;
+  border: 1px solid #E5E5E0;
   cursor: pointer;
-  border-radius: 2px;
+  transition: all 0.15s ease-out;
 }
 
 .logout-btn:hover {
-  color: #ef4444;
-  border-color: #ef4444;
-}
-
-/* === Utilities === */
-
-.spin {
-  display: inline-block;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  color: #CC0000;
+  border-color: #CC0000;
 }
 
 /* === Log Management === */
 
 .log-stats {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  color: #71717a;
+  color: #737373;
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -650,11 +674,29 @@ body {
 
 .log-status {
   margin-top: 8px;
-  font-size: 11px;
-  font-family: 'DM Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
-  color: #10b981;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #111111;
 }
 
 .log-status.error {
-  color: #ef4444;
+  color: #CC0000;
+}
+
+/* === Scrollbar === */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F5F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #A3A3A3;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #111111;
 }

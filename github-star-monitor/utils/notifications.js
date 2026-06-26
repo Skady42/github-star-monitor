@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export function notifyUpdates(updates) {
   if (!updates || updates.length === 0) return;
 
@@ -6,37 +8,41 @@ export function notifyUpdates(updates) {
     chrome.notifications.create(`release-${u.repo.replace('/', '-')}-${Date.now()}`, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: `${u.repo} 发布新 Release`,
+      title: `${u.repo} ${t('releaseNew')}`,
       message: `${u.name || u.tag}`,
       priority: 2,
-      requireInteraction: true
+      requireInteraction: false
     }, (notificationId) => {
       if (chrome.runtime.lastError) {
         console.warn('[Monitor] Notification error:', chrome.runtime.lastError.message);
+        return;
       }
+      setTimeout(() => chrome.notifications.clear(notificationId), 5000);
     });
   } else {
     const repoList = updates.map(u => `${u.repo} -> ${u.tag}`).join('\n');
     chrome.notifications.create(`release-summary-${Date.now()}`, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: `${updates.length} 个仓库有新 Release`,
+      title: `${updates.length} ${t('releaseMulti')}`,
       message: repoList.slice(0, 200),
       priority: 2,
-      requireInteraction: true
+      requireInteraction: false
     }, (notificationId) => {
       if (chrome.runtime.lastError) {
         console.warn('[Monitor] Notification error:', chrome.runtime.lastError.message);
+        return;
       }
+      setTimeout(() => chrome.notifications.clear(notificationId), 5000);
     });
   }
 }
 
 export function notifyScanComplete(reposCount, newReleaseCount, elapsedMs) {
   const title = newReleaseCount > 0
-    ? `找到 ${newReleaseCount} 个新 Release`
-    : '扫描完成，无新 Release';
-  const message = `检查了 ${reposCount} 个仓库，耗时 ${Math.round(elapsedMs / 1000)} 秒`;
+    ? `${t('foundNew')} ${newReleaseCount} ${t('releaseCount')}`
+    : t('scanComplete');
+  const message = `${t('checked')} ${reposCount} ${t('repos')} ${t('took')} ${Math.round(elapsedMs / 1000)} ${t('seconds')}`;
 
   chrome.notifications.create(`scan-complete-${Date.now()}`, {
     type: 'basic',
@@ -48,6 +54,8 @@ export function notifyScanComplete(reposCount, newReleaseCount, elapsedMs) {
   }, (notificationId) => {
     if (chrome.runtime.lastError) {
       console.warn('[Monitor] Scan-notification error:', chrome.runtime.lastError.message);
+      return;
     }
+    setTimeout(() => chrome.notifications.clear(notificationId), 5000);
   });
 }

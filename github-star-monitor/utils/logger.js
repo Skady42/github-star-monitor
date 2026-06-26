@@ -1,13 +1,10 @@
-const LOG_STORAGE_KEY = 'app_logs';
+import { STORAGE_KEYS } from './storage.js';
+
+const LOG_STORAGE_KEY = STORAGE_KEYS.LOGS;
 const MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_LOG_COUNT = 200;
 
-const LOG_LEVELS = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3
-};
+let _logBuffer = [];
 
 function generateId() {
   return Date.now() + '_' + Math.random().toString(36).substring(2, 8);
@@ -35,9 +32,7 @@ async function setStoredLogs(logs) {
 
 async function pruneLogs(logs) {
   const now = Date.now();
-  // 24-hour rolling window
   let pruned = logs.filter(log => (now - new Date(log.timestamp).getTime()) < MAX_LOG_AGE_MS);
-  // Cap at 200 entries, remove oldest first
   if (pruned.length > MAX_LOG_COUNT) {
     pruned = pruned.slice(pruned.length - MAX_LOG_COUNT);
   }
@@ -56,12 +51,8 @@ async function log(level, event, message, data) {
     entry.data = data;
   }
 
-  const logs = await getStoredLogs();
-  logs.push(entry);
-  const pruned = await pruneLogs(logs);
-  await setStoredLogs(pruned);
+  _logBuffer.push(entry);
 
-  // Also output to console for development
   const prefix = `[${entry.level}] ${event}`;
   switch (level) {
     case 'DEBUG':
@@ -77,6 +68,15 @@ async function log(level, event, message, data) {
       console.error(prefix, message, data || '');
       break;
   }
+}
+
+export async function flushLogs() {
+  if (_logBuffer.length === 0) return;
+  const toFlush = _logBuffer.splice(0);
+  const logs = await getStoredLogs();
+  logs.push(...toFlush);
+  const pruned = await pruneLogs(logs);
+  await setStoredLogs(pruned);
 }
 
 function debug(event, message, data) {

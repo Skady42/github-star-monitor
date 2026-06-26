@@ -1,12 +1,13 @@
 import {
   getToken, setToken, getUser, setUser,
   getLastCheckTime, setLastCheckTime,
-  getKnownReleases, getPendingUpdates, mergeNewReleases,
+  getKnownReleases, getPendingUpdates, mergeNewReleases, markAsRead,
   getLastCheckStatus, setLastCheckStatus,
   getOAuthClientId, setOAuthClientId,
   getOAuthClientSecret, setOAuthClientSecret,
   getCheckInterval, setCheckInterval,
-  getReleaseEtags, setReleaseEtags
+  getReleaseEtags, setReleaseEtags,
+  getLanguage
 } from './utils/storage.js';
 
 import {
@@ -15,7 +16,9 @@ import {
 
 import { notifyUpdates, notifyScanComplete } from './utils/notifications.js';
 
-import { debug as logDebug, info as logInfo, warn as logWarn, error as logError } from './utils/logger.js';
+import { debug as logDebug, info as logInfo, warn as logWarn, error as logError, flushLogs } from './utils/logger.js';
+
+import { setLang } from './utils/i18n.js';
 
 const ALARM_NAME = 'check-releases';
 const CONCURRENCY = 3;
@@ -66,21 +69,21 @@ async function performCheck() {
   try {
     logInfo('check_start', '开始检查更新');
 
-  const token = await getToken();
-  if (!token) {
-    await setLastCheckStatus('no_token');
-    logWarn('check_skip_no_token', '无 Token，跳过检查');
-    return;
-  }
+    const token = await getToken();
+    if (!token) {
+      await setLastCheckStatus('no_token');
+      logWarn('check_skip_no_token', '无 Token，跳过检查');
+      return;
+    }
 
-  const connected = await checkConnectivity();
-  if (!connected) {
-    await setLastCheckStatus('network_error');
-    logWarn('check_skip_network', 'GitHub 不可达，跳过检查');
-    return;
-  }
+    const connected = await checkConnectivity();
+    if (!connected) {
+      await setLastCheckStatus('network_error');
+      logWarn('check_skip_network', 'GitHub 不可达，跳过检查');
+      return;
+    }
 
-  try {
+    try {
     const scanStart = performance.now();
     const repos = await getStarredRepos(token);
     logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
@@ -135,6 +138,7 @@ async function performCheck() {
   }
   } finally {
     _isChecking = false;
+    await flushLogs();
   }
 }
 
@@ -277,15 +281,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
+      case 'markAsRead':
+        await markAsRead(message.repo);
+        sendResponse({ success: true });
+        break;
+
       default:
         sendResponse({ error: 'Unknown action' });
     }
-  })();
+  })().catch(err => {
+    try { sendResponse({ error: err.message }); } catch {}
+  });
   return true;
 });
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   logInfo('extension_installed', `扩展安装/更新: ${details.reason}`);
+  const lang = await getLanguage();
+  setLang(lang);
   setupAlarm();
 
   if (details.reason === 'update') {
@@ -323,6 +336,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   logInfo('browser_startup', '浏览器启动');
+  const lang = await getLanguage();
+  setLang(lang);
   setupAlarm();
 
   const lastCheckTime = await getLastCheckTime();
