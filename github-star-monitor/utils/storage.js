@@ -99,10 +99,6 @@ export async function mergeNewReleases(allStarredRepoNames, newReleases) {
   return genuinelyNew;
 }
 
-export async function clearUpdates() {
-  await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: [] });
-}
-
 export async function getLastCheckStatus() {
   const result = await chrome.storage.local.get(STORAGE_KEYS.LAST_CHECK_STATUS);
   return result[STORAGE_KEYS.LAST_CHECK_STATUS] || null;

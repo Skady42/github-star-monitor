@@ -1,7 +1,7 @@
 import {
   getToken, setToken, getUser, setUser,
   getLastCheckTime, setLastCheckTime,
-  getKnownReleases, getPendingUpdates, mergeNewReleases, markAsRead,
+  getPendingUpdates, mergeNewReleases, markAsRead,
   getLastCheckStatus, setLastCheckStatus,
   getOAuthClientId, setOAuthClientId,
   getOAuthClientSecret, setOAuthClientSecret,

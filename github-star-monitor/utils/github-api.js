@@ -2,6 +2,8 @@ const GITHUB_API = 'https://api.github.com';
 const CONNECTIVITY_TIMEOUT = 8000;
 const REQUEST_TIMEOUT = 10000;
 
+import { warn as logWarn } from './logger.js';
+
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -33,7 +35,7 @@ async function maybeWaitForRateLimit(response) {
 
   if (remainingNum < 10 && resetTime > Date.now()) {
     const waitMs = Math.min(resetTime - Date.now(), 30000);
-    console.log(`[Monitor] Rate limit low (${remainingNum} remaining), waiting ${waitMs}ms`);
+    logWarn('rate_limit_wait', `Rate limit low (${remainingNum} remaining), waiting ${waitMs}ms`);
     await new Promise(r => setTimeout(r, waitMs));
   }
 }
@@ -47,6 +49,7 @@ export async function checkConnectivity() {
         return true;
       }
     } catch {
+      logWarn('connectivity_failed', `连通性检查失败: ${url}`);
       continue;
     }
   }
@@ -96,18 +99,18 @@ export async function getLatestRelease(token, owner, repo, etag = null) {
   }
 
   const response = await fetchWithTimeout(
-    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=3`,
+    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=1`,
     { headers }
   );
 
   const newEtag = response.headers.get('ETag') || etag;
 
   if (response.status === 304) {
-    return { changed: false, etag: newEtag, release: null };
+    return { etag: newEtag, release: null };
   }
 
   if (response.status === 404) {
-    return { changed: false, etag: newEtag, release: null };
+    return { etag: newEtag, release: null };
   }
 
   if (!response.ok) {
@@ -121,7 +124,6 @@ export async function getLatestRelease(token, owner, repo, etag = null) {
 
   const latest = releases[0];
   return {
-    changed: true,
     etag: newEtag,
     release: {
       repo: `${owner}/${repo}`,

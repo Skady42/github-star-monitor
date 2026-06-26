@@ -21,6 +21,9 @@ async function init() {
     document.getElementById('redirectUri').textContent = '...';
   }
 
+  const manifest = chrome.runtime.getManifest();
+  document.getElementById('versionDisplay').textContent = manifest.version;
+
   await loadStatus();
   setupEventListeners();
   updateLogStats();

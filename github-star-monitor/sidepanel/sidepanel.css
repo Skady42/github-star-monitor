@@ -672,6 +672,27 @@ body {
   gap: 8px;
 }
 
+.log-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: #F9F9F7;
+  color: #111111;
+  border: 1px solid #111111;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease-out;
+}
+
+.log-btn:hover {
+  background: #111111;
+  color: #F9F9F7;
+}
+
 .log-status {
   margin-top: 8px;
   font-family: 'JetBrains Mono', monospace;
@@ -681,6 +702,36 @@ body {
 
 .log-status.error {
   color: #CC0000;
+}
+
+.repo-link {
+  display: block;
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #111111;
+  text-decoration: none;
+  border: 1px solid #111111;
+  text-align: center;
+  transition: all 0.15s ease-out;
+}
+
+.repo-link:hover {
+  background: #111111;
+  color: #F9F9F7;
+}
+
+.version-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #A3A3A3;
+  text-align: center;
+  padding: 8px 0;
 }
 
 /* === Scrollbar === */
