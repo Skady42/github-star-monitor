@@ -83,59 +83,56 @@ async function performCheck() {
       return;
     }
 
-    try {
-      const scanStart = performance.now();
-      const repos = await getStarredRepos(token);
-      logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
+    const scanStart = performance.now();
+    const repos = await getStarredRepos(token);
+    logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
 
-      const etags = await getReleaseEtags();
+    const etags = await getReleaseEtags();
 
-      const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
-        try {
-          const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
-          if (result.release) {
-            result.release.stars = repo.stargazers_count || 0;
-          }
-          return { full_name: repo.full_name, ...result };
-        } catch (err) {
-          logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
-          return { full_name: repo.full_name, etag: etags[repo.full_name], release: null };
+    const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
+      try {
+        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
+        if (result.release) {
+          result.release.stars = repo.stargazers_count || 0;
         }
-      });
-
-      const newReleases = repoResults.filter(r => r.release).map(r => r.release);
-
-      // ⚠️ 必须先 mergeNewReleases 再 setReleaseEtags！
-      // 如果 ETag 先更新但 known 还没写，SW 被杀后新 Release 会被 304 永久跳过
-      const genuinelyNew = await mergeNewReleases(
-        repos.map(r => r.full_name),
-        newReleases
-      );
-
-      const newEtags = {};
-      for (const r of repoResults) {
-        if (r.etag) newEtags[r.full_name] = r.etag;
+        return { full_name: repo.full_name, ...result };
+      } catch (err) {
+        logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
+        return { full_name: repo.full_name, etag: etags[repo.full_name], release: null };
       }
-      await setReleaseEtags(newEtags);
+    });
 
-      const elapsed = performance.now() - scanStart;
+    const newReleases = repoResults.filter(r => r.release).map(r => r.release);
 
-      if (genuinelyNew.length > 0) {
-        logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
-        notifyUpdates(genuinelyNew);
-      } else {
-        logInfo('check_no_new', '没有新更新');
-      }
+    // 必须先 mergeNewReleases 再 setReleaseEtags
+    const genuinelyNew = await mergeNewReleases(
+      repos.map(r => r.full_name),
+      newReleases
+    );
 
-      // 总是发送扫描完成通知（即使无新 Release）
-      notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
+    const newEtags = {};
+    for (const r of repoResults) {
+      if (r.etag) newEtags[r.full_name] = r.etag;
+    }
+    await setReleaseEtags(newEtags);
 
-      await setLastCheckTime(new Date().toISOString());
-      await setLastCheckStatus('success');
-    } catch (err) {
-      logError('check_failed', '检查失败', { error: err.message });
-      await setLastCheckStatus('error');
-    } finally {
+    const elapsed = performance.now() - scanStart;
+
+    if (genuinelyNew.length > 0) {
+      logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
+      notifyUpdates(genuinelyNew);
+    } else {
+      logInfo('check_no_new', '没有新更新');
+    }
+
+    notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
+
+    await setLastCheckTime(new Date().toISOString());
+    await setLastCheckStatus('success');
+  } catch (err) {
+    logError('check_failed', '检查失败', { error: err.message });
+    await setLastCheckStatus('error');
+  } finally {
     _isChecking = false;
     await flushLogs();
   }
