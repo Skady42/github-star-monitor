@@ -84,59 +84,58 @@ async function performCheck() {
     }
 
     try {
-    const scanStart = performance.now();
-    const repos = await getStarredRepos(token);
-    logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
+      const scanStart = performance.now();
+      const repos = await getStarredRepos(token);
+      logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
 
-    const etags = await getReleaseEtags();
+      const etags = await getReleaseEtags();
 
-    const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
-      try {
-        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
-        if (result.release) {
-          result.release.stars = repo.stargazers_count || 0;
+      const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
+        try {
+          const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
+          if (result.release) {
+            result.release.stars = repo.stargazers_count || 0;
+          }
+          return { full_name: repo.full_name, ...result };
+        } catch (err) {
+          logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
+          return { full_name: repo.full_name, etag: etags[repo.full_name], release: null };
         }
-        return { full_name: repo.full_name, ...result };
-      } catch (err) {
-        logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
-        return { full_name: repo.full_name, changed: false, etag: etags[repo.full_name], release: null };
+      });
+
+      const newReleases = repoResults.filter(r => r.release).map(r => r.release);
+
+      // ⚠️ 必须先 mergeNewReleases 再 setReleaseEtags！
+      // 如果 ETag 先更新但 known 还没写，SW 被杀后新 Release 会被 304 永久跳过
+      const genuinelyNew = await mergeNewReleases(
+        repos.map(r => r.full_name),
+        newReleases
+      );
+
+      const newEtags = {};
+      for (const r of repoResults) {
+        if (r.etag) newEtags[r.full_name] = r.etag;
       }
-    });
+      await setReleaseEtags(newEtags);
 
-    const newReleases = repoResults.filter(r => r.release).map(r => r.release);
+      const elapsed = performance.now() - scanStart;
 
-    // ⚠️ 必须先 mergeNewReleases 再 setReleaseEtags！
-    // 如果 ETag 先更新但 known 还没写，SW 被杀后新 Release 会被 304 永久跳过
-    const genuinelyNew = await mergeNewReleases(
-      repos.map(r => r.full_name),
-      newReleases
-    );
+      if (genuinelyNew.length > 0) {
+        logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
+        notifyUpdates(genuinelyNew);
+      } else {
+        logInfo('check_no_new', '没有新更新');
+      }
 
-    const newEtags = {};
-    for (const r of repoResults) {
-      if (r.etag) newEtags[r.full_name] = r.etag;
-    }
-    await setReleaseEtags(newEtags);
+      // 总是发送扫描完成通知（即使无新 Release）
+      notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
 
-    const elapsed = performance.now() - scanStart;
-
-    if (genuinelyNew.length > 0) {
-      logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
-      notifyUpdates(genuinelyNew);
-    } else {
-      logInfo('check_no_new', '没有新更新');
-    }
-
-    // 总是发送扫描完成通知（即使无新 Release）
-    notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
-
-    await setLastCheckTime(new Date().toISOString());
-    await setLastCheckStatus('success');
-  } catch (err) {
-    logError('check_failed', '检查失败', { error: err.message });
-    await setLastCheckStatus('error');
-  }
-  } finally {
+      await setLastCheckTime(new Date().toISOString());
+      await setLastCheckStatus('success');
+    } catch (err) {
+      logError('check_failed', '检查失败', { error: err.message });
+      await setLastCheckStatus('error');
+    } finally {
     _isChecking = false;
     await flushLogs();
   }
@@ -155,7 +154,12 @@ async function startOAuth() {
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('scope', 'read:user');
-  authUrl.searchParams.set('state', Math.random().toString(36).substring(2));
+
+  const stateArr = new Uint8Array(16);
+  crypto.getRandomValues(stateArr);
+  const state = Array.from(stateArr, b => b.toString(16).padStart(2, '0')).join('');
+  await chrome.storage.local.set({ oauth_state: state });
+  authUrl.searchParams.set('state', state);
 
   try {
     const redirectUrl = await chrome.identity.launchWebAuthFlow({
@@ -164,6 +168,13 @@ async function startOAuth() {
     });
 
     const url = new URL(redirectUrl);
+    const returnedState = url.searchParams.get('state');
+    const savedState = await chrome.storage.local.get('oauth_state');
+    if (returnedState !== savedState.oauth_state) {
+      throw new Error('OAuth state mismatch');
+    }
+    await chrome.storage.local.remove('oauth_state');
+
     const code = url.searchParams.get('code');
 
     if (!code) {

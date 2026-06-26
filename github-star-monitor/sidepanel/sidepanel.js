@@ -233,6 +233,9 @@ function applyFilters() {
   if (filtered.length === 0 && currentUpdates.length > 0) {
     emptyState.innerHTML = '&#x25CB; ' + t('noUpdatesFiltered');
     emptyState.style.display = 'block';
+  } else if (filtered.length === 0 && currentUpdates.length === 0) {
+    emptyState.innerHTML = '&#x25CB; ' + t('noUpdates');
+    emptyState.style.display = 'block';
   }
 }
 
@@ -242,8 +245,12 @@ async function updateLogStats() {
   document.getElementById('logCountDisplay').textContent = t('logCount') + ': ' + count;
 }
 
+let _searchDebounce = null;
 function setupEventListeners() {
-  document.getElementById('searchInput').addEventListener('input', applyFilters);
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(_searchDebounce);
+    _searchDebounce = setTimeout(applyFilters, 150);
+  });
   document.getElementById('sortSelect').addEventListener('change', applyFilters);
 
   document.getElementById('langSelect').addEventListener('change', async () => {
