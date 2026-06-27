@@ -57,6 +57,8 @@ export const translations = {
     foundNew: '找到',
     releaseCount: '个新 Release',
     scanComplete: '扫描完成，无新 Release',
+    releaseStable: '正式版',
+    releasePreRelease: '预发行版',
     checked: '检查了',
     repos: '个仓库',
     took: '耗时',
@@ -125,7 +127,9 @@ export const translations = {
     repos: 'repos',
     took: 'in',
     seconds: 'seconds',
-    noUpdatesFiltered: 'No matching results'
+    noUpdatesFiltered: 'No matching results',
+    releaseStable: 'STABLE',
+    releasePreRelease: 'PRE-RELEASE'
   }
 };
 

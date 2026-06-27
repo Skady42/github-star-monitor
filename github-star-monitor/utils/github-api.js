@@ -92,14 +92,15 @@ export async function getStarredRepos(token) {
   return repos;
 }
 
-export async function getLatestRelease(token, owner, repo, etag = null) {
+export async function getLatestRelease(token, owner, repo, etag = null, releaseType = 'stable') {
   const headers = { 'Authorization': `Bearer ${token}` };
   if (etag) {
     headers['If-None-Match'] = etag;
   }
 
+  const perPage = releaseType === 'all' ? 1 : 10;
   const response = await fetchWithTimeout(
-    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=1`,
+    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=${perPage}`,
     { headers }
   );
 
@@ -119,18 +120,29 @@ export async function getLatestRelease(token, owner, repo, etag = null) {
 
   const releases = await response.json();
   if (releases.length === 0) {
-    return { changed: false, etag: newEtag, release: null };
+    return { etag: newEtag, release: null };
   }
 
-  const latest = releases[0];
+  let target = releases[0];
+  if (releaseType === 'stable') {
+    target = releases.find(r => !r.prerelease) || null;
+  } else if (releaseType === 'pre-release') {
+    target = releases.find(r => r.prerelease) || null;
+  }
+
+  if (!target) {
+    return { etag: newEtag, release: null };
+  }
+
   return {
     etag: newEtag,
     release: {
       repo: `${owner}/${repo}`,
-      tag: latest.tag_name,
-      name: latest.name || latest.tag_name,
-      url: latest.html_url,
-      published_at: latest.published_at
+      tag: target.tag_name,
+      name: target.name || target.tag_name,
+      url: target.html_url,
+      published_at: target.published_at,
+      prerelease: target.prerelease
     }
   };
 }

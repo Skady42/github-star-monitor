@@ -1,6 +1,24 @@
-import { t } from './i18n.js';
+import { t, setLang } from './i18n.js';
+import { getLanguage } from './storage.js';
 
-export function notifyUpdates(updates) {
+let _langLoaded = false;
+
+async function ensureLang() {
+  if (!_langLoaded) {
+    const lang = await getLanguage();
+    setLang(lang);
+    _langLoaded = true;
+  }
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.language) {
+    setLang(changes.language.newValue);
+  }
+});
+
+export async function notifyUpdates(updates) {
+  await ensureLang();
   if (!updates || updates.length === 0) return;
 
   if (updates.length === 1) {
@@ -38,7 +56,8 @@ export function notifyUpdates(updates) {
   }
 }
 
-export function notifyScanComplete(reposCount, newReleaseCount, elapsedMs) {
+export async function notifyScanComplete(reposCount, newReleaseCount, elapsedMs) {
+  await ensureLang();
   const title = newReleaseCount > 0
     ? `${t('foundNew')} ${newReleaseCount} ${t('releaseCount')}`
     : t('scanComplete');

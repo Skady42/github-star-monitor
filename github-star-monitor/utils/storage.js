@@ -10,7 +10,8 @@ export const STORAGE_KEYS = {
   CHECK_INTERVAL: 'check_interval',
   LANG: 'language',
   RELEASE_ETAGS: 'release_etags',
-  LOGS: 'app_logs'
+  LOGS: 'app_logs',
+  REPO_SETTINGS: 'repo_settings'
 };
 
 export async function getToken() {
@@ -157,4 +158,20 @@ export async function markAsRead(repo) {
   const updates = await getPendingUpdates();
   const updated = updates.map(u => u.repo === repo ? { ...u, read: true } : u);
   await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: updated });
+}
+
+export async function getRepoSettings() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.REPO_SETTINGS);
+  return result[STORAGE_KEYS.REPO_SETTINGS] || {};
+}
+
+export async function getRepoReleaseType(repo) {
+  const settings = await getRepoSettings();
+  return settings[repo]?.releaseType || 'stable';
+}
+
+export async function setRepoReleaseType(repo, releaseType) {
+  const settings = await getRepoSettings();
+  settings[repo] = { ...settings[repo], releaseType };
+  await chrome.storage.local.set({ [STORAGE_KEYS.REPO_SETTINGS]: settings });
 }

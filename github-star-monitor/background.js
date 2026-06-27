@@ -7,7 +7,7 @@ import {
   getOAuthClientSecret, setOAuthClientSecret,
   getCheckInterval, setCheckInterval,
   getReleaseEtags, setReleaseEtags,
-  getLanguage
+  getLanguage, getRepoSettings, setRepoReleaseType
 } from './utils/storage.js';
 
 import {
@@ -88,10 +88,12 @@ async function performCheck() {
     logInfo('check_repos_found', `找到 ${repos.length} 个标星仓库`, { repoCount: repos.length });
 
     const etags = await getReleaseEtags();
+    const repoSettings = await getRepoSettings();
 
     const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
       try {
-        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name]);
+        const releaseType = repoSettings[repo.full_name]?.releaseType || 'stable';
+        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name], releaseType);
         if (result.release) {
           result.release.stars = repo.stargazers_count || 0;
         }
@@ -120,12 +122,12 @@ async function performCheck() {
 
     if (genuinelyNew.length > 0) {
       logInfo('check_new_releases', `发现 ${genuinelyNew.length} 个新 Release`, { count: genuinelyNew.length });
-      notifyUpdates(genuinelyNew);
+      await notifyUpdates(genuinelyNew);
     } else {
       logInfo('check_no_new', '没有新更新');
     }
 
-    notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
+    await notifyScanComplete(repos.length, genuinelyNew.length, elapsed);
 
     await setLastCheckTime(new Date().toISOString());
     await setLastCheckStatus('success');
@@ -264,17 +266,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ updates, status, lastCheckTime: time });
         break;
 
-      case 'getStatus':
-        const s = await getLastCheckStatus();
-        const t = await getLastCheckTime();
-        const u = await getPendingUpdates();
-        const user = await getUser();
-        const token = await getToken();
-        const hasCreds = !!(await getOAuthClientId() && await getOAuthClientSecret());
+      case 'getStatus': {
+        const data = await chrome.storage.local.get([
+          'last_check_status', 'last_check_time', 'pending_updates',
+          'github_user', 'github_token', 'oauth_client_id', 'oauth_client_secret',
+          'check_interval'
+        ]);
+        const hasCreds = !!(data.oauth_client_id && data.oauth_client_secret);
         const redirUri = chrome.identity.getRedirectURL('oauth2');
-        const checkInterval = await getCheckInterval();
-        sendResponse({ status: s, lastCheckTime: t, updates: u, user, hasToken: !!token, hasCredentials: hasCreds, redirectUri: redirUri, checkInterval });
+        sendResponse({
+          status: data.last_check_status || null,
+          lastCheckTime: data.last_check_time || null,
+          updates: data.pending_updates || [],
+          user: data.github_user || null,
+          hasToken: !!data.github_token,
+          hasCredentials: hasCreds,
+          redirectUri: redirUri,
+          checkInterval: data.check_interval || 60
+        });
         break;
+      }
 
       case 'logout':
         await chrome.storage.local.clear();
@@ -292,6 +303,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'markAsRead':
         await markAsRead(message.repo);
         sendResponse({ success: true });
+        break;
+
+      case 'setRepoReleaseType':
+        await setRepoReleaseType(message.repo, message.releaseType);
+        sendResponse({ success: true });
+        break;
+
+      case 'getRepoSettings':
+        const settings = await getRepoSettings();
+        sendResponse({ settings });
         break;
 
       default:

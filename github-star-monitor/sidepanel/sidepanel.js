@@ -27,10 +27,17 @@ async function init() {
   await loadStatus();
   setupEventListeners();
   updateLogStats();
+  loadRepoSettings();
 }
 
 function applyLanguage() {
-  document.querySelector('.console-title').innerHTML = '<span>//</span> ' + t('title');
+  const titleEl = document.querySelector('.console-title');
+  titleEl.textContent = '';
+  const slash = document.createElement('span');
+  slash.textContent = '//';
+  titleEl.appendChild(slash);
+  titleEl.appendChild(document.createTextNode(' ' + t('title')));
+
   document.getElementById('settingsBtn').title = t('settings');
   document.getElementById('backBtn').textContent = t('back');
   document.querySelector('.settings-title').textContent = t('settings');
@@ -50,24 +57,40 @@ function applyLanguage() {
   sort.options[4].textContent = t('sortStarsDesc');
   sort.options[5].textContent = t('sortStarsAsc');
 
-  document.getElementById('emptyState').innerHTML = '&#x25CB; ' + t('noUpdates');
-  document.getElementById('errorState').innerHTML = '&#x26A0; ' + t('networkUnreach');
-  document.getElementById('noTokenState').innerHTML = '&#x26A0; ' + t('noToken');
+  document.getElementById('emptyState').textContent = '\u25CB ' + t('noUpdates');
+  document.getElementById('errorState').textContent = '\u26A0 ' + t('networkUnreach');
+  document.getElementById('noTokenState').textContent = '\u26A0 ' + t('noToken');
   document.getElementById('logoutBtn').textContent = t('disconnect');
 
   const hint = document.querySelector('.config-hint');
-  hint.innerHTML = t('configTitle') + '<ol><li><a href="https://github.com/settings/developers" target="_blank">' + t('stepCreate') + '</a></li><li>' + t('stepCallback') + '</li><li>' + t('stepFill') + '</li></ol>';
+  hint.textContent = '';
+  hint.appendChild(document.createTextNode(t('configTitle')));
+  const ol = document.createElement('ol');
+  const steps = [t('stepCreate'), t('stepCallback'), t('stepFill')];
+  steps.forEach((step, i) => {
+    const li = document.createElement('li');
+    if (i === 0) {
+      const a = document.createElement('a');
+      a.href = 'https://github.com/settings/developers';
+      a.target = '_blank';
+      a.textContent = step;
+      li.appendChild(a);
+    } else {
+      li.textContent = step;
+    }
+    ol.appendChild(li);
+  });
+  hint.appendChild(ol);
+
   document.querySelector('.redirect-label').textContent = t('redirectLabel');
   document.getElementById('copyRedirectBtn').textContent = t('copy');
   document.querySelectorAll('.config-label')[0].textContent = t('clientId');
   document.querySelectorAll('.config-label')[1].textContent = t('clientSecret');
   document.getElementById('configSaveBtn').textContent = t('saveCreds');
 
-  // Log management
   document.getElementById('logManagementLabel').textContent = t('logManagement');
   document.getElementById('exportLogBtn').textContent = t('exportLog');
   document.getElementById('clearLogBtn').textContent = t('clearLog');
-  // Refresh log count display with new language
   document.getElementById('logCountDisplay').textContent = t('logCount') + ': ' + (document.getElementById('logCountDisplay').textContent.split(': ')[1] || '0');
 }
 
@@ -167,6 +190,12 @@ async function loadStatus() {
 }
 
 let currentUpdates = [];
+let repoSettings = {};
+
+async function loadRepoSettings() {
+  const result = await sendMessage({ action: 'getRepoSettings' });
+  repoSettings = result.settings || {};
+}
 
 function renderUpdateList(updates) {
   currentUpdates = updates;
@@ -214,13 +243,37 @@ function applyFilters() {
     a.className = 'update-item' + (update.read ? ' read' : '');
     a.href = update.url;
     a.target = '_blank';
-    a.innerHTML = `
-      <div class="update-item-repo">${escapeHtml(update.repo)}</div>
-      <div class="update-item-meta">
-        <span class="update-item-tag">${escapeHtml(update.tag)}</span>
-        <span class="update-item-date">${formatDate(new Date(update.published_at))}</span>
-      </div>
-    `;
+
+    const repoDiv = document.createElement('div');
+    repoDiv.className = 'update-item-repo';
+    repoDiv.textContent = update.repo;
+
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'update-item-meta';
+
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'update-item-tag';
+    tagSpan.textContent = update.tag;
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'update-item-date';
+    dateSpan.textContent = formatDate(new Date(update.published_at));
+
+    metaDiv.appendChild(tagSpan);
+    metaDiv.appendChild(dateSpan);
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'update-item-menu';
+    menuBtn.textContent = '\u22EE';
+    menuBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showRepoMenu(update.repo, menuBtn);
+    });
+
+    a.appendChild(repoDiv);
+    a.appendChild(metaDiv);
+    a.appendChild(menuBtn);
     if (!update.read) {
       a.addEventListener('click', async (e) => {
         if (!update.read) {
@@ -234,10 +287,10 @@ function applyFilters() {
   });
 
   if (filtered.length === 0 && currentUpdates.length > 0) {
-    emptyState.innerHTML = '&#x25CB; ' + t('noUpdatesFiltered');
+    emptyState.textContent = '\u25CB ' + t('noUpdatesFiltered');
     emptyState.style.display = 'block';
   } else if (filtered.length === 0 && currentUpdates.length === 0) {
-    emptyState.innerHTML = '&#x25CB; ' + t('noUpdates');
+    emptyState.textContent = '\u25CB ' + t('noUpdates');
     emptyState.style.display = 'block';
   }
 }
@@ -411,6 +464,67 @@ function setupEventListeners() {
   });
 }
 
+function showRepoMenu(repo, anchorEl) {
+  closeRepoMenu();
+
+  const currentType = repoSettings[repo]?.releaseType || 'stable';
+
+  const menu = document.createElement('div');
+  menu.className = 'repo-menu';
+  menu.id = 'repoMenu';
+
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  const title = document.createElement('div');
+  title.className = 'repo-menu-title';
+  title.textContent = repo;
+  menu.appendChild(title);
+
+  const options = [
+    { type: 'stable', label: t('releaseStable') },
+    { type: 'pre-release', label: t('releasePreRelease') }
+  ];
+
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'repo-menu-option' + (currentType === opt.type ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      repoSettings[repo] = { releaseType: opt.type };
+      await sendMessage({ action: 'setRepoReleaseType', repo, releaseType: opt.type });
+      closeRepoMenu();
+      await performCheckAndReload();
+    });
+    menu.appendChild(btn);
+  });
+
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = rect.bottom + 4 + 'px';
+  menu.style.left = (rect.left - 100) + 'px';
+  menu.style.zIndex = '1000';
+
+  document.body.appendChild(menu);
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', closeRepoMenu, { once: true });
+  }, 0);
+}
+
+function closeRepoMenu() {
+  const existing = document.getElementById('repoMenu');
+  if (existing) existing.remove();
+}
+
+async function performCheckAndReload() {
+  await sendMessage({ action: 'checkNow' });
+  await loadRepoSettings();
+  await loadStatus();
+}
+
 function sendMessage(message) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, (response) => {
@@ -442,10 +556,4 @@ function formatDate(date) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
