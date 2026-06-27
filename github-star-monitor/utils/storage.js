@@ -160,6 +160,12 @@ export async function markAsRead(repo) {
   await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: updated });
 }
 
+export async function markAllAsRead() {
+  const updates = await getPendingUpdates();
+  const updated = updates.map(u => ({ ...u, read: true }));
+  await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_UPDATES]: updated });
+}
+
 export async function getRepoSettings() {
   const result = await chrome.storage.local.get(STORAGE_KEYS.REPO_SETTINGS);
   return result[STORAGE_KEYS.REPO_SETTINGS] || {};
@@ -173,5 +179,11 @@ export async function getRepoReleaseType(repo) {
 export async function setRepoReleaseType(repo, releaseType) {
   const settings = await getRepoSettings();
   settings[repo] = { ...settings[repo], releaseType };
+  await chrome.storage.local.set({ [STORAGE_KEYS.REPO_SETTINGS]: settings });
+}
+
+export async function setRepoMuted(repo, muted) {
+  const settings = await getRepoSettings();
+  settings[repo] = { ...settings[repo], muted };
   await chrome.storage.local.set({ [STORAGE_KEYS.REPO_SETTINGS]: settings });
 }

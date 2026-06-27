@@ -1,13 +1,13 @@
 import {
   getToken, setToken, getUser, setUser,
   getLastCheckTime, setLastCheckTime,
-  getPendingUpdates, mergeNewReleases, markAsRead,
+  getPendingUpdates, mergeNewReleases, markAsRead, markAllAsRead,
   getLastCheckStatus, setLastCheckStatus,
   getOAuthClientId, setOAuthClientId,
   getOAuthClientSecret, setOAuthClientSecret,
   getCheckInterval, setCheckInterval,
   getReleaseEtags, setReleaseEtags,
-  getLanguage, getRepoSettings, setRepoReleaseType
+  getLanguage, getRepoSettings, setRepoReleaseType, setRepoMuted
 } from './utils/storage.js';
 
 import {
@@ -57,6 +57,13 @@ function setupAlarm() {
       logInfo('alarm_set', `Alarm set for ${nextHour.toISOString()} (interval: ${periodMinutes}min)`);
     });
   });
+}
+
+async function updateBadge() {
+  const updates = await getPendingUpdates();
+  const unread = updates.filter(u => !u.read).length;
+  chrome.action.setBadgeText({ text: unread > 0 ? String(unread) : '' });
+  chrome.action.setBadgeBackgroundColor({ color: unread > 0 ? '#CC0000' : '' });
 }
 
 async function performCheck() {
@@ -112,11 +119,11 @@ async function performCheck() {
       newReleases
     );
 
-    const newEtags = {};
+    const oldEtags = await getReleaseEtags();
     for (const r of repoResults) {
-      if (r.etag) newEtags[r.full_name] = r.etag;
+      if (r.etag) oldEtags[r.full_name] = r.etag;
     }
-    await setReleaseEtags(newEtags);
+    await setReleaseEtags(oldEtags);
 
     const elapsed = performance.now() - scanStart;
 
@@ -131,6 +138,7 @@ async function performCheck() {
 
     await setLastCheckTime(new Date().toISOString());
     await setLastCheckStatus('success');
+    await updateBadge();
   } catch (err) {
     logError('check_failed', '检查失败', { error: err.message });
     await setLastCheckStatus('error');
@@ -288,7 +296,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'logout':
-        await chrome.storage.local.clear();
+        await chrome.storage.local.remove([
+          'github_token', 'github_user',
+          'oauth_client_id', 'oauth_client_secret', 'oauth_state'
+        ]);
         logInfo('logout', '用户已登出');
         sendResponse({ success: true });
         break;
@@ -302,11 +313,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'markAsRead':
         await markAsRead(message.repo);
+        await updateBadge();
+        sendResponse({ success: true });
+        break;
+
+      case 'markAllAsRead':
+        await markAllAsRead();
+        await updateBadge();
         sendResponse({ success: true });
         break;
 
       case 'setRepoReleaseType':
         await setRepoReleaseType(message.repo, message.releaseType);
+        sendResponse({ success: true });
+        break;
+
+      case 'setRepoMuted':
+        await setRepoMuted(message.repo, message.muted);
         sendResponse({ success: true });
         break;
 

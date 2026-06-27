@@ -309,6 +309,12 @@ function setupEventListeners() {
   });
   document.getElementById('sortSelect').addEventListener('change', applyFilters);
 
+  document.getElementById('markAllReadBtn').addEventListener('click', async () => {
+    await sendMessage({ action: 'markAllAsRead' });
+    currentUpdates = currentUpdates.map(u => ({ ...u, read: true }));
+    applyFilters();
+  });
+
   document.getElementById('langSelect').addEventListener('change', async () => {
     currentLang = document.getElementById('langSelect').value;
     setLang(currentLang);
@@ -482,6 +488,8 @@ function showRepoMenu(repo, anchorEl) {
   title.textContent = repo;
   menu.appendChild(title);
 
+  const isMuted = repoSettings[repo]?.muted || false;
+
   const options = [
     { type: 'stable', label: t('releaseStable') },
     { type: 'pre-release', label: t('releasePreRelease') }
@@ -493,13 +501,25 @@ function showRepoMenu(repo, anchorEl) {
     btn.textContent = opt.label;
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      repoSettings[repo] = { releaseType: opt.type };
+      repoSettings[repo] = { ...repoSettings[repo], releaseType: opt.type };
       await sendMessage({ action: 'setRepoReleaseType', repo, releaseType: opt.type });
       closeRepoMenu();
       await performCheckAndReload();
     });
     menu.appendChild(btn);
   });
+
+  const muteBtn = document.createElement('button');
+  muteBtn.className = 'repo-menu-option' + (isMuted ? ' active' : '');
+  muteBtn.textContent = isMuted ? t('unmute') : t('mute');
+  muteBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    repoSettings[repo] = { ...repoSettings[repo], muted: !isMuted };
+    await sendMessage({ action: 'setRepoMuted', repo, muted: !isMuted });
+    closeRepoMenu();
+    await performCheckAndReload();
+  });
+  menu.appendChild(muteBtn);
 
   const rect = anchorEl.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -525,9 +545,13 @@ async function performCheckAndReload() {
   await loadStatus();
 }
 
-function sendMessage(message) {
+function sendMessage(message, timeoutMs = 30000) {
   return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({ error: 'Timeout: service worker may be sleeping' });
+    }, timeoutMs);
     chrome.runtime.sendMessage(message, (response) => {
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         resolve({ error: chrome.runtime.lastError.message });
       } else {

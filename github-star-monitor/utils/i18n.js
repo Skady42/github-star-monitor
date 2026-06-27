@@ -59,6 +59,9 @@ export const translations = {
     scanComplete: '扫描完成，无新 Release',
     releaseStable: '正式版',
     releasePreRelease: '预发行版',
+    mute: '静音',
+    unmute: '取消静音',
+    markAllRead: '全部已读',
     checked: '检查了',
     repos: '个仓库',
     took: '耗时',
@@ -129,7 +132,10 @@ export const translations = {
     seconds: 'seconds',
     noUpdatesFiltered: 'No matching results',
     releaseStable: 'STABLE',
-    releasePreRelease: 'PRE-RELEASE'
+    releasePreRelease: 'PRE-RELEASE',
+    mute: 'MUTE',
+    unmute: 'UNMUTE',
+    markAllRead: 'MARK ALL READ'
   }
 };
 

@@ -98,9 +98,8 @@ export async function getLatestRelease(token, owner, repo, etag = null, releaseT
     headers['If-None-Match'] = etag;
   }
 
-  const perPage = releaseType === 'all' ? 1 : 10;
   const response = await fetchWithTimeout(
-    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=${perPage}`,
+    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=10`,
     { headers }
   );
 
