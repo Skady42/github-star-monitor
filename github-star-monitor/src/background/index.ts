@@ -1,5 +1,5 @@
 import {
-  getToken, setToken, getUser, setUser,
+  getToken, setToken, setUser,
   getLastCheckTime, setLastCheckTime,
   getPendingUpdates, mergeNewReleases, markAsRead, markAllAsRead,
   getLastCheckStatus, setLastCheckStatus,
@@ -7,23 +7,24 @@ import {
   getOAuthClientSecret, setOAuthClientSecret,
   getCheckInterval, setCheckInterval,
   getReleaseEtags, setReleaseEtags,
-  getLanguage, getRepoSettings, setRepoReleaseType, setRepoMuted
-} from './utils/storage.js';
+  getLanguage, getRepoSettings, setRepoReleaseType, setRepoDisabled
+} from '../lib/storage.js';
 
 import {
   checkConnectivity, getStarredRepos, getLatestRelease
-} from './utils/github-api.js';
+} from '../lib/github-api.js';
 
-import { notifyUpdates, notifyScanComplete } from './utils/notifications.js';
+import { notifyUpdates, notifyScanComplete } from '../lib/notifications.js';
 
-import { debug as logDebug, info as logInfo, warn as logWarn, error as logError, flushLogs } from './utils/logger.js';
+import { info as logInfo, warn as logWarn, error as logError, flushLogs } from '../lib/logger.js';
 
-import { setLang } from './utils/i18n.js';
+import { setLang } from '../lib/i18n.js';
+
+import type { LatestReleaseResult, StarredRepo } from '../lib/types.js';
 
 const ALARM_NAME = 'check-releases';
 const CONCURRENCY = 3;
 
-// 内存锁：防止 performCheck 并发执行（两个检查同时写 storage 会互相覆盖）
 let _isChecking = false;
 
 const GITHUB_OAUTH = {
@@ -31,8 +32,21 @@ const GITHUB_OAUTH = {
   tokenUrl: 'https://github.com/login/oauth/access_token'
 };
 
-async function batchWithConcurrency(items, limit, handler) {
-  const results = [];
+type MessageAction =
+  | { action: 'saveCredentials'; clientId: string; clientSecret: string }
+  | { action: 'startOAuth' }
+  | { action: 'checkNow' }
+  | { action: 'getStatus' }
+  | { action: 'logout' }
+  | { action: 'saveSettings'; interval: string }
+  | { action: 'markAsRead'; repo: string }
+  | { action: 'markAllAsRead' }
+  | { action: 'setRepoReleaseType'; repo: string; releaseType: 'stable' | 'pre-release' }
+  | { action: 'setRepoDisabled'; repo: string; disabled: boolean }
+  | { action: 'getRepoSettings' };
+
+async function batchWithConcurrency<T, R>(items: T[], limit: number, handler: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
   for (let i = 0; i < items.length; i += limit) {
     const batch = items.slice(i, i + limit);
     const batchResults = await Promise.all(batch.map(handler));
@@ -41,14 +55,14 @@ async function batchWithConcurrency(items, limit, handler) {
   return results;
 }
 
-function setupAlarm() {
+function setupAlarm(): void {
   getCheckInterval().then(interval => {
     const periodMinutes = Math.max(1, Math.min(1440, interval));
     chrome.alarms.clear(ALARM_NAME, () => {
       const now = new Date();
       const nextHour = new Date(now);
       nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-      const delayMinutes = Math.max(1, (nextHour - now) / 60000);
+      const delayMinutes = Math.max(1, (nextHour.getTime() - now.getTime()) / 60000);
 
       chrome.alarms.create(ALARM_NAME, {
         periodInMinutes: periodMinutes,
@@ -59,14 +73,14 @@ function setupAlarm() {
   });
 }
 
-async function updateBadge() {
+async function updateBadge(): Promise<void> {
   const updates = await getPendingUpdates();
   const unread = updates.filter(u => !u.read).length;
   chrome.action.setBadgeText({ text: unread > 0 ? String(unread) : '' });
   chrome.action.setBadgeBackgroundColor({ color: unread > 0 ? '#CC0000' : '' });
 }
 
-async function performCheck() {
+async function performCheck(): Promise<void> {
   if (_isChecking) {
     logWarn('check_skip_concurrent', '有检查正在运行，跳过本次');
     return;
@@ -97,23 +111,23 @@ async function performCheck() {
     const etags = await getReleaseEtags();
     const repoSettings = await getRepoSettings();
 
-    const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo) => {
+    const repoResults = await batchWithConcurrency(repos, CONCURRENCY, async (repo: StarredRepo) => {
       try {
         const releaseType = repoSettings[repo.full_name]?.releaseType || 'stable';
-        const result = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name], releaseType);
+        const result: LatestReleaseResult = await getLatestRelease(token, repo.owner, repo.name, etags[repo.full_name], releaseType);
         if (result.release) {
-          result.release.stars = repo.stargazers_count || 0;
+          (result.release as unknown as Record<string, unknown>).stars = repo.stargazers_count || 0;
         }
         return { full_name: repo.full_name, ...result };
       } catch (err) {
-        logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: err.message });
+        const error = err as Error;
+        logWarn('check_repo_failed', `检查仓库失败: ${repo.full_name}`, { repo: repo.full_name, error: error.message });
         return { full_name: repo.full_name, etag: etags[repo.full_name], release: null };
       }
     });
 
-    const newReleases = repoResults.filter(r => r.release).map(r => r.release);
+    const newReleases = repoResults.filter(r => r.release).map(r => r.release!);
 
-    // 必须先 mergeNewReleases 再 setReleaseEtags
     const genuinelyNew = await mergeNewReleases(
       repos.map(r => r.full_name),
       newReleases
@@ -140,7 +154,8 @@ async function performCheck() {
     await setLastCheckStatus('success');
     await updateBadge();
   } catch (err) {
-    logError('check_failed', '检查失败', { error: err.message });
+    const error = err as Error;
+    logError('check_failed', '检查失败', { error: error.message });
     await setLastCheckStatus('error');
   } finally {
     _isChecking = false;
@@ -148,7 +163,7 @@ async function performCheck() {
   }
 }
 
-async function startOAuth() {
+async function startOAuth(): Promise<{ success: boolean; user?: string; error?: string }> {
   const clientId = await getOAuthClientId();
   const clientSecret = await getOAuthClientSecret();
 
@@ -173,6 +188,10 @@ async function startOAuth() {
       url: authUrl.toString(),
       interactive: true
     });
+
+    if (!redirectUrl) {
+      throw new Error('No redirect URL received');
+    }
 
     const url = new URL(redirectUrl);
     const returnedState = url.searchParams.get('state');
@@ -223,23 +242,22 @@ async function startOAuth() {
     }
     throw new Error('Failed to get access token');
   } catch (err) {
-    logError('oauth_failed', 'OAuth 失败', { error: err.message });
-    return { success: false, error: err.message };
+    const error = err as Error;
+    logError('oauth_failed', 'OAuth 失败', { error: error.message });
+    return { success: false, error: error.message };
   }
 }
 
-// Click action icon -> open side panel (setPanelBehavior handles this)
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
-  .catch((error) => console.error(error));
+  .catch((error: unknown) => console.error(error));
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm: chrome.alarms.Alarm) => {
   if (alarm.name === ALARM_NAME) {
     const lastCheckTime = await getLastCheckTime();
     const interval = await getCheckInterval();
     const intervalMs = interval * 60 * 1000;
     if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > intervalMs) {
-      // 额外防御：如果距上次检查不到 30 秒，跳过（防止浏览器启动时的双触发）
       if (lastCheckTime && (Date.now() - new Date(lastCheckTime).getTime()) < 30000) {
         logWarn('check_skip_alarm_recent', '上次检查不到 30 秒，跳过 alarm 触发');
         return;
@@ -251,7 +269,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: MessageAction, _sender: chrome.runtime.MessageSender, sendResponse: (response: Record<string, unknown>) => void) => {
   (async () => {
     switch (message.action) {
       case 'saveCredentials':
@@ -304,12 +322,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
-      case 'saveSettings':
+      case 'saveSettings': {
         const minutes = parseInt(message.interval) || 60;
         await setCheckInterval(Math.max(1, Math.min(1440, minutes)));
         setupAlarm();
         sendResponse({ success: true });
         break;
+      }
 
       case 'markAsRead':
         await markAsRead(message.repo);
@@ -328,36 +347,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
-      case 'setRepoMuted':
-        await setRepoMuted(message.repo, message.muted);
+      case 'setRepoDisabled':
+        await setRepoDisabled(message.repo, message.disabled);
         sendResponse({ success: true });
         break;
 
-      case 'getRepoSettings':
+      case 'getRepoSettings': {
         const settings = await getRepoSettings();
         sendResponse({ settings });
         break;
+      }
 
       default:
         sendResponse({ error: 'Unknown action' });
     }
-  })().catch(err => {
-    try { sendResponse({ error: err.message }); } catch {}
+  })().catch((err: unknown) => {
+    const error = err as Error;
+    try { sendResponse({ error: error.message }); } catch {}
   });
   return true;
 });
 
-chrome.runtime.onInstalled.addListener(async (details) => {
+chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledDetails) => {
   logInfo('extension_installed', `扩展安装/更新: ${details.reason}`);
   const lang = await getLanguage();
-  setLang(lang);
+  setLang(lang as 'zh' | 'en');
   setupAlarm();
 
   if (details.reason === 'update') {
-    // 清理 pending_updates 中被旧版本 ETag bug 污染的重复条目
     const updates = await getPendingUpdates();
     if (updates.length > 0) {
-      const latestPerRepo = new Map();
+      const latestPerRepo = new Map<string, typeof updates[number]>();
       for (const u of updates) {
         const prev = latestPerRepo.get(u.repo);
         if (!prev || new Date(u.published_at) > new Date(prev.published_at)) {
@@ -372,7 +392,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 
   if (details.reason === 'install') {
-    // 首次安装跳过检查，避免所有标星仓库全部变成"新 Release"轰炸用户
     const now = new Date().toISOString();
     await setLastCheckTime(now);
     logInfo('install_skip_check', '首次安装跳过检查，避免全部仓库标记为新 Release');
@@ -389,13 +408,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.runtime.onStartup.addListener(async () => {
   logInfo('browser_startup', '浏览器启动');
   const lang = await getLanguage();
-  setLang(lang);
+  setLang(lang as 'zh' | 'en');
   setupAlarm();
 
   const lastCheckTime = await getLastCheckTime();
   const interval = await getCheckInterval();
   if (!lastCheckTime || (Date.now() - new Date(lastCheckTime).getTime()) > interval * 60 * 1000) {
-    // 安装时已设置 lastCheckTime，如果距上次检查不到 60 秒，跳过启动检查
     if (lastCheckTime && (Date.now() - new Date(lastCheckTime).getTime()) < 60000) {
       logWarn('check_skip_startup_recent', '距上次检查不到 60 秒，跳过启动检查');
       return;

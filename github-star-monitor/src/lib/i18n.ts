@@ -1,4 +1,6 @@
-export const translations = {
+import type { TranslationKeys, TranslationKey, SupportedLanguage } from './types';
+
+export const translations: Record<SupportedLanguage, TranslationKeys> = {
   zh: {
     title: 'GitHub Star Monitor',
     settings: '设置',
@@ -59,8 +61,8 @@ export const translations = {
     scanComplete: '扫描完成，无新 Release',
     releaseStable: '正式版',
     releasePreRelease: '预发行版',
-    mute: '静音',
-    unmute: '取消静音',
+    disableCheck: '禁用检查',
+    enableCheck: '启用检查',
     markAllRead: '全部已读',
     checked: '检查了',
     repos: '个仓库',
@@ -133,22 +135,22 @@ export const translations = {
     noUpdatesFiltered: 'No matching results',
     releaseStable: 'STABLE',
     releasePreRelease: 'PRE-RELEASE',
-    mute: 'MUTE',
-    unmute: 'UNMUTE',
+    disableCheck: 'DISABLE CHECK',
+    enableCheck: 'ENABLE CHECK',
     markAllRead: 'MARK ALL READ'
   }
 };
 
-let _currentLang = 'zh';
+let _currentLang: SupportedLanguage = 'zh';
 
-export function setLang(lang) {
+export function setLang(lang: SupportedLanguage): void {
   _currentLang = lang;
 }
 
-export function getLang() {
+export function getLang(): SupportedLanguage {
   return _currentLang;
 }
 
-export function t(key) {
+export function t(key: TranslationKey): string {
   return translations[_currentLang]?.[key] || translations.en[key] || key;
 }

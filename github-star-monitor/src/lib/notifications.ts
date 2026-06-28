@@ -1,23 +1,24 @@
-import { t, setLang } from './i18n.js';
-import { getLanguage } from './storage.js';
+import { t, setLang } from './i18n';
+import { getLanguage } from './storage';
+import type { ReleaseWithRead, SupportedLanguage } from './types';
 
 let _langLoaded = false;
 
-async function ensureLang() {
+async function ensureLang(): Promise<void> {
   if (!_langLoaded) {
-    const lang = await getLanguage();
+    const lang = (await getLanguage()) as SupportedLanguage;
     setLang(lang);
     _langLoaded = true;
   }
 }
 
-chrome.storage.onChanged.addListener((changes, area) => {
+chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
   if (area === 'local' && changes.language) {
-    setLang(changes.language.newValue);
+    setLang(changes.language.newValue as SupportedLanguage);
   }
 });
 
-export async function notifyUpdates(updates) {
+export async function notifyUpdates(updates: ReleaseWithRead[]): Promise<void> {
   await ensureLang();
   if (!updates || updates.length === 0) return;
 
@@ -30,7 +31,7 @@ export async function notifyUpdates(updates) {
       message: `${u.name || u.tag}`,
       priority: 2,
       requireInteraction: false
-    }, (notificationId) => {
+    }, (notificationId: string) => {
       if (chrome.runtime.lastError) {
         console.warn('[Monitor] Notification error:', chrome.runtime.lastError.message);
         return;
@@ -46,7 +47,7 @@ export async function notifyUpdates(updates) {
       message: repoList.slice(0, 200),
       priority: 2,
       requireInteraction: false
-    }, (notificationId) => {
+    }, (notificationId: string) => {
       if (chrome.runtime.lastError) {
         console.warn('[Monitor] Notification error:', chrome.runtime.lastError.message);
         return;
@@ -56,7 +57,7 @@ export async function notifyUpdates(updates) {
   }
 }
 
-export async function notifyScanComplete(reposCount, newReleaseCount, elapsedMs) {
+export async function notifyScanComplete(reposCount: number, newReleaseCount: number, elapsedMs: number): Promise<void> {
   await ensureLang();
   const title = newReleaseCount > 0
     ? `${t('foundNew')} ${newReleaseCount} ${t('releaseCount')}`
@@ -70,7 +71,7 @@ export async function notifyScanComplete(reposCount, newReleaseCount, elapsedMs)
     message,
     priority: 1,
     requireInteraction: false
-  }, (notificationId) => {
+  }, (notificationId: string) => {
     if (chrome.runtime.lastError) {
       console.warn('[Monitor] Scan-notification error:', chrome.runtime.lastError.message);
       return;

@@ -1,16 +1,17 @@
-import { STORAGE_KEYS } from './storage.js';
+import { STORAGE_KEYS } from './storage';
+import type { LogEntry, LogLevel } from './types';
 
 const LOG_STORAGE_KEY = STORAGE_KEYS.LOGS;
-const MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_LOG_COUNT = 200;
 
-let _logBuffer = [];
+let _logBuffer: LogEntry[] = [];
 
-function generateId() {
+function generateId(): string {
   return Date.now() + '_' + Math.random().toString(36).substring(2, 8);
 }
 
-function formatTimestamp(isoString) {
+function formatTimestamp(isoString: string): string {
   const d = new Date(isoString);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -21,16 +22,16 @@ function formatTimestamp(isoString) {
   return `${y}-${m}-${day} ${h}:${min}:${s}`;
 }
 
-async function getStoredLogs() {
+async function getStoredLogs(): Promise<LogEntry[]> {
   const result = await chrome.storage.local.get(LOG_STORAGE_KEY);
   return result[LOG_STORAGE_KEY] || [];
 }
 
-async function setStoredLogs(logs) {
+async function setStoredLogs(logs: LogEntry[]): Promise<void> {
   await chrome.storage.local.set({ [LOG_STORAGE_KEY]: logs });
 }
 
-async function pruneLogs(logs) {
+async function pruneLogs(logs: LogEntry[]): Promise<LogEntry[]> {
   const now = Date.now();
   let pruned = logs.filter(log => (now - new Date(log.timestamp).getTime()) < MAX_LOG_AGE_MS);
   if (pruned.length > MAX_LOG_COUNT) {
@@ -39,13 +40,13 @@ async function pruneLogs(logs) {
   return pruned;
 }
 
-async function log(level, event, message, data) {
-  const entry = {
+async function log(level: LogLevel, event: string, message: string, data?: unknown): Promise<void> {
+  const entry: LogEntry = {
     id: generateId(),
     timestamp: new Date().toISOString(),
-    level: level,
-    event: event,
-    message: message
+    level,
+    event,
+    message
   };
   if (data !== undefined) {
     entry.data = data;
@@ -70,7 +71,7 @@ async function log(level, event, message, data) {
   }
 }
 
-export async function flushLogs() {
+export async function flushLogs(): Promise<void> {
   if (_logBuffer.length === 0) return;
   const toFlush = _logBuffer.splice(0);
   const logs = await getStoredLogs();
@@ -79,31 +80,31 @@ export async function flushLogs() {
   await setStoredLogs(pruned);
 }
 
-function debug(event, message, data) {
+function debug(event: string, message: string, data?: unknown): Promise<void> {
   return log('DEBUG', event, message, data);
 }
 
-function info(event, message, data) {
+function info(event: string, message: string, data?: unknown): Promise<void> {
   return log('INFO', event, message, data);
 }
 
-function warn(event, message, data) {
+function warn(event: string, message: string, data?: unknown): Promise<void> {
   return log('WARN', event, message, data);
 }
 
-function error(event, message, data) {
+function error(event: string, message: string, data?: unknown): Promise<void> {
   return log('ERROR', event, message, data);
 }
 
-async function getLogs() {
+async function getLogs(): Promise<LogEntry[]> {
   return await getStoredLogs();
 }
 
-async function clearLogs() {
+async function clearLogs(): Promise<void> {
   await chrome.storage.local.remove(LOG_STORAGE_KEY);
 }
 
-async function exportLogs() {
+async function exportLogs(): Promise<string> {
   const logs = await getStoredLogs();
   if (!logs || logs.length === 0) {
     return '';

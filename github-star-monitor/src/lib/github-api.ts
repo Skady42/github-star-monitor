@@ -1,10 +1,12 @@
+import type { StarredRepo, LatestReleaseResult } from './types';
+
 const GITHUB_API = 'https://api.github.com';
 const CONNECTIVITY_TIMEOUT = 8000;
 const REQUEST_TIMEOUT = 10000;
 
-import { warn as logWarn } from './logger.js';
+import { warn as logWarn } from './logger';
 
-async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout: number = REQUEST_TIMEOUT): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
@@ -24,7 +26,7 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
   }
 }
 
-async function maybeWaitForRateLimit(response) {
+async function maybeWaitForRateLimit(response: Response): Promise<void> {
   const remaining = response.headers.get('X-RateLimit-Remaining');
   const reset = response.headers.get('X-RateLimit-Reset');
   if (!remaining || !reset) return;
@@ -36,11 +38,11 @@ async function maybeWaitForRateLimit(response) {
   if (remainingNum < 10 && resetTime > Date.now()) {
     const waitMs = Math.min(resetTime - Date.now(), 30000);
     logWarn('rate_limit_wait', `Rate limit low (${remainingNum} remaining), waiting ${waitMs}ms`);
-    await new Promise(r => setTimeout(r, waitMs));
+    await new Promise<void>(r => setTimeout(r, waitMs));
   }
 }
 
-export async function checkConnectivity() {
+export async function checkConnectivity(): Promise<boolean> {
   const urls = [GITHUB_API, 'https://github.com'];
   for (const url of urls) {
     try {
@@ -56,8 +58,8 @@ export async function checkConnectivity() {
   return false;
 }
 
-export async function getStarredRepos(token) {
-  const repos = [];
+export async function getStarredRepos(token: string): Promise<StarredRepo[]> {
+  const repos: StarredRepo[] = [];
   let page = 1;
   const perPage = 100;
   let hasMore = true;
@@ -76,7 +78,13 @@ export async function getStarredRepos(token) {
       throw new Error(`Failed to fetch starred repos: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: Array<{
+      full_name: string;
+      owner: { login: string };
+      name: string;
+      html_url: string;
+      stargazers_count: number;
+    }> = await response.json();
     repos.push(...data.map(r => ({
       full_name: r.full_name,
       owner: r.owner.login,
@@ -92,8 +100,14 @@ export async function getStarredRepos(token) {
   return repos;
 }
 
-export async function getLatestRelease(token, owner, repo, etag = null, releaseType = 'stable') {
-  const headers = { 'Authorization': `Bearer ${token}` };
+export async function getLatestRelease(
+  token: string,
+  owner: string,
+  repo: string,
+  etag: string | null = null,
+  releaseType: 'stable' | 'pre-release' = 'stable'
+): Promise<LatestReleaseResult> {
+  const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
   if (etag) {
     headers['If-None-Match'] = etag;
   }
@@ -117,16 +131,22 @@ export async function getLatestRelease(token, owner, repo, etag = null, releaseT
     throw new Error(`Failed to fetch releases for ${owner}/${repo}: ${response.status}`);
   }
 
-  const releases = await response.json();
+  const releases: Array<{
+    prerelease: boolean;
+    tag_name: string;
+    name: string;
+    html_url: string;
+    published_at: string;
+  }> = await response.json();
   if (releases.length === 0) {
     return { etag: newEtag, release: null };
   }
 
   let target = releases[0];
   if (releaseType === 'stable') {
-    target = releases.find(r => !r.prerelease) || null;
+    target = releases.find(r => !r.prerelease) || releases[0];
   } else if (releaseType === 'pre-release') {
-    target = releases.find(r => r.prerelease) || null;
+    target = releases.find(r => r.prerelease) || releases[0];
   }
 
   if (!target) {
