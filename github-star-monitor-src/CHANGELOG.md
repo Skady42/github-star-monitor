@@ -1,6 +1,16 @@
 # 更新日志
 
-## v2.0.0 (2026-06-27)
+## v2.1 (2026-06-28)
+
+### 修复
+- **点击更新不标记已读** — 点击更新项后正确标记为已读，先更新本地状态再 fire-and-forget 通知 background
+- **更新项改为 div** — `<a>` 替换为 `<div role="button">`，移除死属性，支持键盘 Enter 操作
+- **manifest service_worker 路径** — 适配 @crxjs/vite-plugin v2.7 的源码路径要求
+- **打包路径分隔符** — zip 文件使用正斜杠路径，修复 Chrome/Edge 无法安装的问题
+
+---
+
+## v2.0 (2026-06-27)
 
 ### 重构
 - **React + TypeScript 重写** — 从原生 JS 迁移到 React 18 + TypeScript 5

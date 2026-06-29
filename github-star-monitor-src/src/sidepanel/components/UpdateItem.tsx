@@ -20,11 +20,13 @@ export default function UpdateItem({ update, onRead, onSettingsChange }: UpdateI
   const [menuOpen, setMenuOpen] = useState(false);
   const menuAnchorRef = useRef<HTMLButtonElement>(null);
 
-  const handleClick = async () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!update.read) {
       onRead(update.repo);
-      await sendMessage({ action: 'markAsRead', repo: update.repo });
+      sendMessage({ action: 'markAsRead', repo: update.repo });
     }
+    window.open(update.url, '_blank', 'noreferrer');
   };
 
   const handleMenuClick = (e: React.MouseEvent) => {
@@ -43,12 +45,12 @@ export default function UpdateItem({ update, onRead, onSettingsChange }: UpdateI
 
   return (
     <>
-      <a
+      <div
         className={`update-item${update.read ? ' read' : ''}`}
-        href={update.url}
-        target="_blank"
-        rel="noreferrer"
+        role="button"
+        tabIndex={0}
         onClick={handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e as unknown as React.MouseEvent); }}
       >
         <div className="update-item-repo">{update.repo}</div>
         <div className="update-item-meta">
@@ -58,7 +60,7 @@ export default function UpdateItem({ update, onRead, onSettingsChange }: UpdateI
         <button className="update-item-menu" ref={menuAnchorRef} onClick={handleMenuClick}>
           &#x22EE;
         </button>
-      </a>
+      </div>
       {menuOpen && (
         <RepoMenu
           repo={update.repo}
